@@ -1,0 +1,70 @@
+# Compile l'AAB signé pour Google Play (fichier du socle, le même pour toutes les apps).
+# Lancer : Actions > Android AAB (Play Store) > Run workflow (version_code = 1, 2, 3…).
+# Secrets nécessaires : KEYSTORE_B64 et KEYSTORE_PASSWORD (clé d'envoi, voir keystore.yml),
+# et APPCORE_TOKEN si le socle (sous-module appcore/) est dans un dépôt privé.
+name: Android AAB (Play Store)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "versionCode : un entier, +1 à chaque envoi sur Google Play"
+        required: true
+        default: "1"
+
+jobs:
+  aab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.APPCORE_TOKEN || github.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: App settings (app_info.py)
+        run: python3 appcore/android/app_config.py . --github-env >> "$GITHUB_ENV"
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool libltdl-dev pkg-config \
+            openjdk-17-jdk zip unzip ccache curl git
+          pip install uv
+
+      - name: Cache Android SDK / NDK / wheels
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pyside6_android_deploy
+            ~/.buildozer
+            build/android/*.whl
+          key: android-pyside6.12.0-ndk-r28c-v1
+          restore-keys: |
+            android-pyside6.12.0-ndk-r28c-
+
+      - name: Prepare app (build_apk.sh sets up venv, SDK, NDK and buildozer.spec)
+        run: bash appcore/android/build_apk.sh
+
+      - name: Restore signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d > "$HOME/$APP_KEYSTORE_NAME"
+
+      - name: Build signed AAB
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: bash appcore/android/release_aab.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-aab
+          path: dist/*.aab
+          retention-days: 7

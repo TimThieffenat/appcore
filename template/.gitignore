@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+build/
+dist/
+.buildozer/
+.venv/
+
+# Clés de signature : ne jamais publier
+*.jks
+*.keystore
+*.aab

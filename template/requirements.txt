@@ -1,0 +1,3 @@
+PySide6>=6.6
+# Python 3.13+ n'a plus audioop (mixage rapide du son) : version de remplacement
+audioop-lts; python_version >= "3.13"

@@ -1,0 +1,95 @@
+"""Traduction des textes du socle : portugais (Brésil) (voir appcore/i18n.py).
+
+Clé : le texte anglais du code ; valeur : sa traduction (un pluriel :
+(singulier, pluriel)). Les champs {nom} doivent rester tels quels. Les textes
+propres à une app sont dans le locales/ de l'app. Après un changement de
+texte : python appcore/tools/i18n_check.py --core."""
+# ruff: noqa: E501
+
+T = {
+    # --- appcore/boot.py
+    '{app} could not start': '{app} não conseguiu iniciar',
+    '{app} stopped last time': '{app} parou da última vez',
+    # --- appcore/crash_report.py
+    'Send by email opens your email app with this report, addressed to {email}. Nothing is sent until you press Send.': '“Enviar por e-mail” abre seu app de e-mail com este relatório, endereçado a {email}. Nada é enviado até você tocar em Enviar.',
+    'Send by email': 'Enviar por e-mail',
+    'Copy': 'Copiar',
+    'Close': 'Fechar',
+    'What were you doing when the problem happened? (optional)': 'O que você estava fazendo quando o problema aconteceu? (opcional)',
+    'Clear': 'Limpar',
+    'Erase the errors and the log (after sending them)': 'Apaga os erros e o registro (depois de enviá-los)',
+    'Copied.': 'Copiado.',
+    'Cleared.': 'Apagado.',
+    'Your email app opens. The report is also copied, in case it is cut.': 'Seu app de e-mail vai abrir. O relatório também foi copiado, caso seja cortado.',
+    'No email app found. The report is copied: paste it in an email to {email}.': 'Nenhum app de e-mail encontrado. O relatório foi copiado: cole-o em um e-mail para {email}.',
+    # --- appcore/music_theory.py
+    'Letters (C D E)': 'Letras (C D E)',
+    '{root} {scale}': '{root} {scale}',
+    '{root} {mode}': '{root} {mode}',
+    'Solfège ({notes})': 'Solfejo ({notes})',
+    'major': 'maior',
+    'minor': 'menor',
+    # --- appcore/page_settings.py
+    'Same as phone': 'Igual ao celular',
+    'Light (pastel)': 'Claro (pastel)',
+    'Dark (neon)': 'Escuro (neon)',
+    'Settings': 'Ajustes',
+    'Same as phone ({language})': 'Igual ao celular ({language})',
+    'Language': 'Idioma',
+    'Theme': 'Tema',
+    'Note names': 'Nomes das notas',
+    'Show': 'Mostrar',
+    'What went wrong and what the app did, to send by email if the app misbehaves': 'O que deu errado e o que o app fez, para enviar por e-mail se o app se comportar mal',
+    'Error report': 'Relatório de erros',
+    'Instrument': 'Instrumento',
+    'Guitars: FluidR3_GM by Frank Wen (CC BY 3.0) · Symbols: DejaVu Sans (Bitstream Vera license)': 'Violões: FluidR3_GM de Frank Wen (CC BY 3.0) · Símbolos: DejaVu Sans (licença Bitstream Vera)',
+    # --- instruments
+    'Steel-string acoustic': 'Violão de cordas de aço',
+    'Nylon-string (classical)': 'Cordas de náilon (clássico)',
+    'Soft keys (all musicians)': 'Teclado suave (todos os músicos)',
+    # --- music_theory: chords
+    'Major': 'Maior',
+    'Minor': 'Menor',
+    'Diminished': 'Diminuto',
+    'Augmented': 'Aumentado',
+    'Sus2': 'Sus2',
+    'Sus4': 'Sus4',
+    '6': '6',
+    'Minor 6': 'Menor 6',
+    '7 (dominant)': '7 (dominante)',
+    'Major 7': 'Maior 7',
+    'Minor 7': 'Menor 7',
+    'Half-diminished (m7♭5)': 'Meio-diminuto (m7♭5)',
+    'Diminished 7': '7 diminuto',
+    'Minor-major 7': 'Menor com 7 maior',
+    '7sus4': '7sus4',
+    'add9': 'add9',
+    '9': '9',
+    'Major 9': 'Maior 9',
+    'Minor 9': 'Menor 9',
+    # --- music_theory: modes
+    'Scale': 'Escala',
+    'Chord': 'Acorde',
+    # --- music_theory: scales
+    'Major (Ionian)': 'Maior (jônia)',
+    'Natural minor (Aeolian)': 'Menor natural (eólia)',
+    'Harmonic minor': 'Menor harmônica',
+    'Melodic minor': 'Menor melódica',
+    'Major pentatonic': 'Pentatônica maior',
+    'Minor pentatonic': 'Pentatônica menor',
+    'Minor blues': 'Blues menor',
+    'Major blues': 'Blues maior',
+    'Dorian': 'Dórica',
+    'Phrygian': 'Frígia',
+    'Lydian': 'Lídia',
+    'Mixolydian': 'Mixolídia',
+    'Locrian': 'Lócria',
+    'Phrygian dominant': 'Frígia dominante',
+    # --- music_theory: tunings
+    'Standard (E A D G B E)': 'Padrão (E A D G B E)',
+    'Drop D (D A D G B E)': 'Drop D (D A D G B E)',
+    'Half step down (E♭)': 'Meio tom abaixo (E♭)',
+    'DADGAD': 'DADGAD',
+    'Open G (D G D G B D)': 'Open G (D G D G B D)',
+    'Open D (D A D F# A D)': 'Open D (D A D F# A D)',
+}

@@ -1,0 +1,95 @@
+"""Traduction des textes du socle : allemand (voir appcore/i18n.py).
+
+Clé : le texte anglais du code ; valeur : sa traduction (un pluriel :
+(singulier, pluriel)). Les champs {nom} doivent rester tels quels. Les textes
+propres à une app sont dans le locales/ de l'app. Après un changement de
+texte : python appcore/tools/i18n_check.py --core."""
+# ruff: noqa: E501
+
+T = {
+    # --- appcore/boot.py
+    '{app} could not start': '{app} konnte nicht starten',
+    '{app} stopped last time': '{app} wurde letztes Mal beendet',
+    # --- appcore/crash_report.py
+    'Send by email opens your email app with this report, addressed to {email}. Nothing is sent until you press Send.': '„Per E-Mail senden“ öffnet deine E-Mail-App mit diesem Bericht an {email}. Es wird nichts gesendet, bevor du auf Senden tippst.',
+    'Send by email': 'Per E-Mail senden',
+    'Copy': 'Kopieren',
+    'Close': 'Schließen',
+    'What were you doing when the problem happened? (optional)': 'Was hast du gemacht, als das Problem auftrat? (optional)',
+    'Clear': 'Leeren',
+    'Erase the errors and the log (after sending them)': 'Löscht die Fehler und das Protokoll (nach dem Senden)',
+    'Copied.': 'Kopiert.',
+    'Cleared.': 'Gelöscht.',
+    'Your email app opens. The report is also copied, in case it is cut.': 'Deine E-Mail-App öffnet sich. Der Bericht ist auch kopiert, falls er abgeschnitten wird.',
+    'No email app found. The report is copied: paste it in an email to {email}.': 'Keine E-Mail-App gefunden. Der Bericht ist kopiert: Füge ihn in eine E-Mail an {email} ein.',
+    # --- appcore/music_theory.py
+    'Letters (C D E)': 'Buchstaben (C D E)',
+    '{root} {scale}': '{root}-{scale}',
+    '{root} {mode}': '{root}-{mode}',
+    'Solfège ({notes})': 'Solmisation ({notes})',
+    'major': 'Dur',
+    'minor': 'Moll',
+    # --- appcore/page_settings.py
+    'Same as phone': 'Wie das Handy',
+    'Light (pastel)': 'Hell (Pastell)',
+    'Dark (neon)': 'Dunkel (Neon)',
+    'Settings': 'Optionen',
+    'Same as phone ({language})': 'Wie das Handy ({language})',
+    'Language': 'Sprache',
+    'Theme': 'Design',
+    'Note names': 'Notennamen',
+    'Show': 'Zeigen',
+    'What went wrong and what the app did, to send by email if the app misbehaves': 'Was schiefgelaufen ist und was die App getan hat – per E-Mail zu senden, falls die App Probleme macht',
+    'Error report': 'Fehlerbericht',
+    'Instrument': 'Instrument',
+    'Guitars: FluidR3_GM by Frank Wen (CC BY 3.0) · Symbols: DejaVu Sans (Bitstream Vera license)': 'Gitarren: FluidR3_GM von Frank Wen (CC BY 3.0) · Symbole: DejaVu Sans (Bitstream-Vera-Lizenz)',
+    # --- instruments
+    'Steel-string acoustic': 'Westerngitarre (Stahlsaiten)',
+    'Nylon-string (classical)': 'Nylonsaiten (Konzertgitarre)',
+    'Soft keys (all musicians)': 'Sanftes Keyboard (für alle Musiker)',
+    # --- music_theory: chords
+    'Major': 'Dur',
+    'Minor': 'Moll',
+    'Diminished': 'Vermindert',
+    'Augmented': 'Übermäßig',
+    'Sus2': 'Sus2',
+    'Sus4': 'Sus4',
+    '6': '6',
+    'Minor 6': 'Moll 6',
+    '7 (dominant)': '7 (Dominante)',
+    'Major 7': 'Maj7',
+    'Minor 7': 'Moll 7',
+    'Half-diminished (m7♭5)': 'Halbvermindert (m7♭5)',
+    'Diminished 7': 'Vermindert 7',
+    'Minor-major 7': 'Moll-Maj7',
+    '7sus4': '7sus4',
+    'add9': 'add9',
+    '9': '9',
+    'Major 9': 'Maj9',
+    'Minor 9': 'Moll 9',
+    # --- music_theory: modes
+    'Scale': 'Tonleiter',
+    'Chord': 'Akkord',
+    # --- music_theory: scales
+    'Major (Ionian)': 'Dur (ionisch)',
+    'Natural minor (Aeolian)': 'Natürliches Moll (äolisch)',
+    'Harmonic minor': 'Harmonisch Moll',
+    'Melodic minor': 'Melodisch Moll',
+    'Major pentatonic': 'Dur-Pentatonik',
+    'Minor pentatonic': 'Moll-Pentatonik',
+    'Minor blues': 'Moll-Blues',
+    'Major blues': 'Dur-Blues',
+    'Dorian': 'Dorisch',
+    'Phrygian': 'Phrygisch',
+    'Lydian': 'Lydisch',
+    'Mixolydian': 'Mixolydisch',
+    'Locrian': 'Lokrisch',
+    'Phrygian dominant': 'Phrygisch-Dominant',
+    # --- music_theory: tunings
+    'Standard (E A D G B E)': 'Standard (E A D G B E)',
+    'Drop D (D A D G B E)': 'Drop D (D A D G B E)',
+    'Half step down (E♭)': 'Halbton tiefer (E♭)',
+    'DADGAD': 'DADGAD',
+    'Open G (D G D G B D)': 'Open G (D G D G B D)',
+    'Open D (D A D F# A D)': 'Open D (D A D F# A D)',
+}

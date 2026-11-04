@@ -1,0 +1,93 @@
+# Compile l'APK Android de test dans le cloud (GitHub Actions), sans rien installer.
+# Fichier du socle (appcore/templates/github/workflows/) : le même pour toutes
+# les apps, tout ce qui est propre à l'app vient de son app_info.py.
+# Lancer : onglet « Actions » du dépôt > « Android APK » > « Run workflow ».
+# L'APK se télécharge ensuite dans les « Artifacts » du run.
+#
+# Signature : toujours la même clé (voir appcore/android/signing_key.sh), pour
+# que le téléphone accepte la nouvelle version par-dessus l'ancienne. Avec les
+# secrets KEYSTORE_B64 et KEYSTORE_PASSWORD (clé d'envoi Google Play), c'est
+# cette clé ; sans eux, une clé de test gardée dans le cache de GitHub.
+#
+# Le socle est un sous-module (appcore/) : s'il est dans un dépôt privé, ajouter
+# le secret APPCORE_TOKEN (jeton GitHub avec accès en lecture à ce dépôt).
+name: Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_api:
+        description: "Version d'Android visée (targetSdk). 36 = Android 16, exigé par Google Play"
+        required: false
+        default: "36"
+  push:
+    tags: ["v*"]
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      APPCORE_ANDROID_API: ${{ inputs.target_api || '36' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.APPCORE_TOKEN || github.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: App settings (app_info.py)
+        run: python3 appcore/android/app_config.py . --github-env >> "$GITHUB_ENV"
+
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool libltdl-dev pkg-config \
+            openjdk-17-jdk zip unzip ccache curl git
+          pip install uv
+
+      - name: Cache Android SDK / NDK / wheels
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pyside6_android_deploy
+            ~/.buildozer
+            build/android/*.whl
+          key: android-pyside6.12.0-ndk-r28c-v1
+          restore-keys: |
+            android-pyside6.12.0-ndk-r28c-
+
+      - name: Restore the test signing key
+        id: debug_key
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: ${{ env.APP_KEY_ALIAS }}-debug-keystore-v1
+
+      - name: Signing key (the same for every build)
+        id: key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: bash appcore/android/signing_key.sh
+
+      - name: Build APK
+        run: bash appcore/android/build_apk.sh
+
+      - name: Keep the test signing key
+        if: steps.key.outputs.kind == 'debug' && steps.debug_key.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: ${{ env.APP_KEY_ALIAS }}-debug-keystore-v1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-apk
+          path: dist/*.apk
+          retention-days: 7   # l'APK (~150 Mo) est supprimé après 7 jours : quota de 500 Mo

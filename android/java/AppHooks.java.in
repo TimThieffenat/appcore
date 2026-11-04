@@ -1,0 +1,31 @@
+// Modèle du socle (appcore/android/java/) : build_apk.sh y met le paquet Java,
+// le nom de l'app (app_info.py) et le range dans le dossier de son paquet.
+// Utilisé seulement si l'app n'a pas son propre AppHooks.java (android/java/
+// de l'app, dans son paquet Java) : celui-ci ne fait rien.
+package @JAVA_PACKAGE@;
+
+import android.app.Activity;
+
+/**
+ * Crochets de l'app dans l'activité principale (KeepAwakeActivity du socle).
+ * Une app qui a du Java à elle (achat dans l'app, notifications…) écrit son
+ * propre AppHooks.java dans android/java/<son paquet>/ avec ces trois méthodes.
+ * Les erreurs sont rattrapées par l'activité.
+ */
+final class AppHooks {
+    private AppHooks() {
+    }
+
+    /** Juste après la création de l'activité (Python démarre ensuite). */
+    static void onCreate(Activity activity) {
+    }
+
+    /** À chaque retour au premier plan. */
+    static void onResume(Activity activity) {
+    }
+
+    /** Réponse de l'utilisateur à une demande d'autorisation. */
+    static void onRequestPermissionsResult(Activity activity, int requestCode,
+                                           String[] permissions, int[] grantResults) {
+    }
+}

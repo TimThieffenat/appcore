@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 #
-# Clé de signature de l'APK de test : TOUJOURS LA MÊME, pour qu'Android accepte
-# d'installer une nouvelle version par-dessus l'ancienne (sinon : « application
-# non installée » et il faut désinstaller, ce qui efface les morceaux).
+# Signing key of the test APK: ALWAYS THE SAME, so that Android agrees
+# to install a new version over the old one (otherwise: "app
+# not installed" and you must uninstall, which erases the user's data).
 #
-# Gradle signe l'APK de test avec ~/.android/debug.keystore. Sur GitHub, chaque
-# compilation partait d'une machine neuve, donc d'une nouvelle clé. Ce script :
-#   1. si les secrets KEYSTORE_B64 et KEYSTORE_PASSWORD existent (ceux de la clé
-#      d'envoi Google Play), copie cette clé sous le nom attendu par Gradle ;
-#   2. sinon, garde la clé de test déjà présente (restaurée du cache GitHub) ou
-#      en crée une, que le workflow met en cache.
-# Écrit « kind=upload » ou « kind=debug » dans $GITHUB_OUTPUT (si défini).
+# Gradle signs the test APK with ~/.android/debug.keystore. On GitHub, each
+# build started from a fresh machine, hence a new key. This script:
+#   1. if the KEYSTORE_B64 and KEYSTORE_PASSWORD secrets exist (those of the
+#      Google Play upload key), copies that key under the name Gradle expects;
+#   2. otherwise, keeps the test key already there (restored from the GitHub cache) or
+#      creates one, which the workflow caches.
+# Writes "kind=upload" or "kind=debug" to $GITHUB_OUTPUT (if set).
 #
 set -euo pipefail
 
-CORE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)    # le socle (appcore/)
-ROOT=${APP_ROOT:-$(cd "$CORE/.." && pwd)}                # le dossier de l'app
+CORE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)    # the base (appcore/)
+ROOT=${APP_ROOT:-$(cd "$CORE/.." && pwd)}                # the app's folder
 DEST_DIR=${ANDROID_USER_HOME:-$HOME/.android}
 DEST=$DEST_DIR/debug.keystore
-# alias de la clé : KEY_ALIAS de app_info.py (par défaut le nom de l'app en minuscules)
+# key alias: KEY_ALIAS of app_info.py (by default the app's name in lower case)
 ALIAS=${KEY_ALIAS:-$(python3 "$CORE/android/app_config.py" "$ROOT" --get APP_KEY_ALIAS)}
 mkdir -p "$DEST_DIR"
 
@@ -36,22 +36,22 @@ if [ -n "${KEYSTORE_B64:-}" ] && [ -n "${KEYSTORE_PASSWORD:-}" ]; then
             -deststorepass android -destkeypass android -destalias androiddebugkey \
             >/dev/null 2>&1; then
         cp "$TMP/debug.keystore" "$DEST"
-        echo "Signature : clé d'envoi (secret KEYSTORE_B64), la même à chaque compilation."
+        echo "Signing: upload key (KEYSTORE_B64 secret), the same for every build."
         keytool -list -keystore "$DEST" -storepass android 2>/dev/null | grep -i "SHA-256\|SHA256" || true
         output upload
         exit 0
     fi
-    echo "::warning::KEYSTORE_B64 / KEYSTORE_PASSWORD ne s'ouvrent pas (mot de passe ? alias '$ALIAS' ?) : clé de test à la place."
+    echo "::warning::KEYSTORE_B64 / KEYSTORE_PASSWORD do not open (password? alias '$ALIAS'?): test key instead."
 fi
 
 if [ -f "$DEST" ]; then
-    echo "Signature : clé de test existante ($DEST)."
+    echo "Signing: existing test key ($DEST)."
 else
     keytool -genkeypair -noprompt -keystore "$DEST" -storetype PKCS12 \
         -storepass android -keypass android -alias androiddebugkey \
         -keyalg RSA -keysize 2048 -validity 10000 \
         -dname "CN=Android Debug, O=Android, C=US" >/dev/null
-    echo "Signature : nouvelle clé de test créée ($DEST)."
+    echo "Signing: new test key created ($DEST)."
 fi
 keytool -list -keystore "$DEST" -storepass android 2>/dev/null | grep -i "SHA-256\|SHA256" || true
 output debug

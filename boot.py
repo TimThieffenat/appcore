@@ -1,9 +1,9 @@
-"""Démarrage d'une app (ordinateur et Android) : tout ce que faisait main.py.
+"""Start-up of an app (desktop and Android): everything main.py used to do.
 
-Le main.py de chaque app se réduit à :
+Each app's main.py comes down to:
 
     import sys
-    from appcore import boot          # en premier : installe le rapport d'erreur
+    from appcore import boot          # first: installs the error report
 
     def pages():
         from appcore.i18n import N_
@@ -14,25 +14,25 @@ Le main.py de chaque app se réduit à :
     if __name__ == "__main__":
         sys.exit(boot.run(pages))
 
-Sur Android, le fichier doit s'appeler main.py (exigence de l'outil de
-compilation) et l'application s'affiche en plein écran.
+On Android the file must be called main.py (required by the build tool)
+and the application is shown full screen.
 
-Le rapport d'erreur (crash_report) est installé à l'import de ce module, avant
-tout le reste : si l'app ne peut pas démarrer, elle affiche pourquoi au lieu
-de se fermer.
+The error report (crash_report) is installed when this module is imported,
+before anything else: if the app cannot start, it shows why instead of
+closing.
 
-run(pages, qss=..., setup=..., started=..., on_language=..., window_class=...) :
-- pages() : la liste (libellé N_(), icône, classe) des pages du rail ; appelée
-  à chaque construction de la fenêtre (changement de langue compris) ;
-- qss : feuille de style de l'app, ajoutée à celle du socle (voir style.py) ;
-- setup(app) : juste après la langue et la police, avant le thème et la
-  fenêtre (reprendre des données, préparer un profil…) ;
-- started(window) : une fois la première fenêtre affichée (achats, rappels…) ;
-  une erreur y est notée dans le journal sans empêcher l'app de démarrer ;
-- on_language(code) : la langue vient de changer, juste avant que la fenêtre
-  soit refaite (textes gardés hors de l'interface : notifications…) ;
-- window_class : une sous-classe de appcore.main_window.MainWindow, si l'app
-  ajoute des choses à la fenêtre (ouvrir une fiche depuis une autre page…).
+run(pages, qss=..., setup=..., started=..., on_language=..., window_class=...):
+- pages(): the list (N_() label, icon, class) of the rail's pages; called
+  every time the window is built (language change included);
+- qss: the app's style sheet, added to the base's one (see style.py);
+- setup(app): right after the language and font, before the theme and the
+  window (take over data, prepare a profile…);
+- started(window): once the first window is shown (purchases, reminders…);
+  an error there is logged without stopping the app from starting;
+- on_language(code): the language just changed, right before the window
+  is rebuilt (texts kept outside the interface: notifications…);
+- window_class: a subclass of appcore.main_window.MainWindow, if the app
+  adds things to the window (open a sheet from another page…).
 """
 
 import logging
@@ -52,7 +52,7 @@ from appcore import app as app_config  # noqa: E402
 
 
 def _show_startup_error(app: QApplication, text: str) -> int:
-    """L'app n'a pas pu démarrer : on montre l'erreur au lieu de se fermer."""
+    """The app could not start: show the error instead of closing."""
     crash_report.record_fatal(text)
     from appcore.i18n import tr
     view = crash_report.report_view(
@@ -68,9 +68,9 @@ def _show_startup_error(app: QApplication, text: str) -> int:
 
 
 class Windows:
-    """La fenêtre principale. Changer de langue la refait entièrement (tous les
-    textes sont écrits à la construction des pages) : chaque page relit ses
-    réglages et ses fichiers, rien n'est perdu."""
+    """The main window. Changing language rebuilds it entirely (all texts are
+    written when the pages are built): each page reads its settings and files
+    again, nothing is lost."""
 
     def __init__(self, app: QApplication, pages, window_class=None, on_language=None) -> None:
         self.app = app
@@ -86,12 +86,12 @@ class Windows:
 
         old = self.window
         if old is not None:
-            old.pause_app()     # son, micro, minuteries de l'ancienne fenêtre
+            old.pause_app()     # sound, microphone, timers of the old window
             try:
                 self.app.applicationStateChanged.disconnect(old.on_app_state_changed)
             except (RuntimeError, TypeError):
                 pass
-            # signaux du bus (sauf la langue) : seules les pages y sont branchées
+            # bus signals (except the language): only pages are connected to them
             for name in bus_page_signals():
                 try:
                     getattr(bus, name).disconnect()
@@ -100,12 +100,12 @@ class Windows:
         crash_report.step("building the pages")
         window = (self.window_class or MainWindow)(self.pages())
         window.show_page(page)
-        # arrière-plan / retour (Android) : couper son, micro et animations
+        # background / back (Android): stop sound, microphone and animations
         self.app.applicationStateChanged.connect(window.on_app_state_changed)
         crash_report.step("showing the window")
         self.window = window
         if is_android():
-            # Plein écran « immersif » : cache la barre d'état et la barre de navigation
+            # "Immersive" full screen: hides the status bar and the navigation bar
             window.showFullScreen()
         else:
             if old is not None:
@@ -116,7 +116,7 @@ class Windows:
             old.deleteLater()
 
     def change_language(self) -> None:
-        """Nouvelle langue : la fenêtre est refaite, sur la page Settings."""
+        """New language: the window is rebuilt, on the Settings page."""
         from appcore.main_window import settings_index
 
         log.info("language changed: the window is rebuilt")
@@ -124,14 +124,14 @@ class Windows:
             try:
                 from appcore import i18n
                 self.on_language(i18n.language())
-            except Exception:  # noqa: BLE001 — la fenêtre doit être refaite quand même
+            except Exception:  # noqa: BLE001 — the window must be rebuilt anyway
                 log.warning("on_language failed", exc_info=True)
         index = settings_index(self.window.pages) if self.window is not None else 0
         QTimer.singleShot(0, lambda: self.open(index))
 
 
 def bus_page_signals() -> list[str]:
-    """Les signaux du bus auxquels les pages se branchent (tous sauf la langue)."""
+    """The bus signals pages connect to (all but the language)."""
     from PySide6.QtCore import Signal
 
     from appcore.app_signals import _Bus
@@ -140,10 +140,10 @@ def bus_page_signals() -> list[str]:
 
 
 def adopt_old_data(app: QApplication) -> None:
-    """L'app a changé de nom (OLD_NAMES de app_info.py) : au premier lancement
-    sous le nouveau nom, on reprend les réglages et les données enregistrés sous
-    l'ancien (sur ordinateur ; sur Android l'app renommée est une autre app, sans
-    accès à l'ancienne). Rien n'est effacé : l'ancien dossier reste en place."""
+    """The app was renamed (OLD_NAMES of app_info.py): at the first start under
+    the new name, the settings and data saved under the old one are taken over
+    (on desktop; on Android the renamed app is another app, with no access to
+    the old one). Nothing is deleted: the old folder stays in place."""
     import shutil
 
     from PySide6.QtCore import QStandardPaths
@@ -175,7 +175,7 @@ def adopt_old_data(app: QApplication) -> None:
 
 
 def app_root() -> Path:
-    """Le dossier de l'app (celui de main.py et de app_info.py)."""
+    """The app's folder (the one holding main.py and app_info.py)."""
     main = sys.modules.get("__main__")
     path = getattr(main, "__file__", None)
     return Path(path).absolute().parent if path else Path(__file__).absolute().parent.parent
@@ -183,7 +183,7 @@ def app_root() -> Path:
 
 def run(pages, qss: str = "", setup=None, started=None, on_language=None,
         window_class=None) -> int:
-    """Lance l'app ; renvoie le code de sortie (pour sys.exit)."""
+    """Runs the app; returns the exit code (for sys.exit)."""
     app = QApplication(sys.argv)
     name = app_config.name()
     app.setOrganizationName(name)
@@ -191,11 +191,11 @@ def run(pages, qss: str = "", setup=None, started=None, on_language=None,
     app.setApplicationVersion(app_config.version())
     try:
         adopt_old_data(app)
-    except Exception:  # noqa: BLE001 — une reprise ratée ne doit pas empêcher de démarrer
+    except Exception:  # noqa: BLE001 — a failed take-over must not prevent start-up
         log.warning("old settings and data not taken over", exc_info=True)
     crash_report.install_qt_messages(app)
-    app.aboutToQuit.connect(crash_report.startup_done)  # fermée tout de suite : pas un plantage
-    # Langue : celle choisie dans Settings, sinon celle du téléphone
+    app.aboutToQuit.connect(crash_report.startup_done)  # closed right away: not a crash
+    # Language: the one chosen in Settings, else the phone's
     from appcore import i18n
     choice = QSettings().value("language", i18n.SYSTEM)
     i18n.set_language(i18n.resolve(choice))
@@ -203,11 +203,11 @@ def run(pages, qss: str = "", setup=None, started=None, on_language=None,
              i18n.system_language())
     crash_report.step("loading the symbols font")
     try:
-        # symboles (♭ ♯ → ↶ ♬ ✕…) intégrés : jamais de carrés vides, quel que soit le téléphone
+        # built-in symbols (♭ ♯ → ↶ ♬ ✕…): never empty boxes, whatever the phone
         from appcore import symbol_font
         if not symbol_font.install(app):
             log.warning("symbols font not loaded")
-    except Exception:  # noqa: BLE001 — sans elle, l'app marche avec les polices du système
+    except Exception:  # noqa: BLE001 — without it, the app works with the system fonts
         log.warning("symbols font not loaded", exc_info=True)
 
     icon = app_root() / "icon.png"
@@ -226,7 +226,7 @@ def run(pages, qss: str = "", setup=None, started=None, on_language=None,
             crash_report.step("setting up the app")
             setup(app)
         crash_report.step("applying the theme")
-        # par défaut, le thème du téléphone (clair ou sombre), suivi en direct
+        # by default, the phone's theme (light or dark), followed live
         style.apply_theme(app, QSettings().value("theme", style.SYSTEM))
         style.follow_system(app, bus.settings_changed.emit)
         bus.language_changed.connect(windows.change_language)
@@ -235,19 +235,19 @@ def run(pages, qss: str = "", setup=None, started=None, on_language=None,
             crash_report.step("starting the app's services")
             try:
                 started(windows.window)
-            except Exception:  # noqa: BLE001 — jamais une raison de ne pas démarrer
+            except Exception:  # noqa: BLE001 — never a reason not to start
                 log.warning("started() failed", exc_info=True)
         crash_report.log_context()
-    except Exception:  # noqa: BLE001 — tout plutôt qu'une app qui se ferme sans rien dire
+    except Exception:  # noqa: BLE001 — anything rather than an app closing silently
         import traceback
         return _show_startup_error(app, traceback.format_exc())
 
     crash_report.step("first seconds")
     QTimer.singleShot(crash_report.STARTUP_GRACE_MS, crash_report.startup_done)
-    # Prépare les notes de l'instrument en arrière-plan, une fois la fenêtre affichée
+    # Prepare the instrument's notes in the background, once the window is shown
     QTimer.singleShot(400, sound.start_warm_up)
     previous = crash_report.previous_crash()
-    if previous:  # le lancement précédent a planté : on le dit, avec le rapport
+    if previous:  # the previous start crashed: say so, with the report
         QTimer.singleShot(800, lambda: crash_report.show_over(
             windows.window, crash_report.full_report(),
             i18n.tr("{app} stopped last time", app=name)))

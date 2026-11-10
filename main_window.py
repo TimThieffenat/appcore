@@ -1,14 +1,14 @@
-"""Fenêtre principale : rail d'icônes à gauche, pages à droite.
+"""Main window: icon rail on the left, pages on the right.
 
-Pensée pour un téléphone en paysage : le rail est étroit (icône + mot court)
-et chaque page occupe tout le reste de l'écran.
+Designed for a phone in landscape: the rail is narrow (icon + short word)
+and each page takes all the rest of the screen.
 
-Les pages viennent de l'app (main.py) : une liste de (libellé, icône, classe),
-le libellé marqué N_() (traduit ici), l'icône un nom de appcore/icons.py ou de
-l'icons.py de l'app. Une page peut avoir :
-- app_paused() / app_resumed() : l'app passe en arrière-plan / revient ;
-- handle_key(event) -> bool : touches (Retour d'Android, Échap, chiffres…),
-  True si la page l'a traitée. Sinon Retour ramène à la première page.
+Pages come from the app (main.py): a list of (label, icon, class),
+the label marked N_() (translated here), the icon a name from appcore/icons.py
+or from the app's icons.py. A page can have:
+- app_paused() / app_resumed(): the app goes to the background / comes back;
+- handle_key(event) -> bool: keys (Android Back, Esc, digits…),
+  True if the page handled it. Otherwise Back returns to the first page.
 """
 
 from __future__ import annotations
@@ -37,22 +37,22 @@ log = logging.getLogger(__name__)
 
 
 def settings_index(pages) -> int:
-    """La page des réglages (celle dont la classe vient de appcore.page_settings),
-    sinon la dernière."""
+    """The settings page (the one whose class comes from appcore.page_settings),
+    else the last one."""
     from appcore.page_settings import SettingsPage
     for i, (_, _, page_class) in enumerate(pages):
         if isinstance(page_class, type) and issubclass(page_class, SettingsPage):
             return i
     return max(0, len(pages) - 1)
 
-# Android met l'app de côté (écran éteint, bouton Accueil, autre app) : sa
-# surface d'affichage est détruite. Rien ne doit plus dessiner ni jouer.
+# Android puts the app aside (screen off, Home button, another app): its
+# drawing surface is destroyed. Nothing must draw or play any more.
 PAUSED_STATES = (Qt.ApplicationState.ApplicationSuspended,
                  Qt.ApplicationState.ApplicationHidden)
 
 RAIL_WIDTH = 84
-BUTTON_MIN, BUTTON_MAX = 32, 50   # hauteur d'un bouton du rail (selon l'écran)
-# Moins de pages : des boutons plus grands (au plus BIG_BUTTON_MAX, PerfectPitch)
+BUTTON_MIN, BUTTON_MAX = 32, 50   # height of a rail button (depends on the screen)
+# Fewer pages: bigger buttons (at most BIG_BUTTON_MAX, PerfectPitch)
 FEW_PAGES, BIG_BUTTON_MAX = 5, 64
 
 
@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
             button.setCheckable(True)
             button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
             button.setIconSize(QSize(20, 20))
-            button.setFixedSize(RAIL_WIDTH - 12, 41)  # ajusté à la hauteur de l'écran
+            button.setFixedSize(RAIL_WIDTH - 12, 41)  # adjusted to the screen height
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             self.group.addButton(button, index)
@@ -114,8 +114,8 @@ class MainWindow(QMainWindow):
         self._fit_rail()
 
     def _fit_rail(self) -> None:
-        """Les boutons du rail se partagent la hauteur de l'écran : toutes les
-        pages restent visibles du petit téléphone à l'ordinateur."""
+        """The rail buttons share the screen height: every page stays
+        visible from a small phone to a desktop."""
         count = len(self.buttons)
         available = self.rail.height() - 8 - (count - 1)
         biggest = BIG_BUTTON_MAX if count <= FEW_PAGES else BUTTON_MAX
@@ -130,31 +130,31 @@ class MainWindow(QMainWindow):
             button.setToolButtonStyle(style)
 
     def _show_page(self, index: int) -> None:
-        sound.playback().stop()  # le son d'une page ne suit pas sur la suivante
+        sound.playback().stop()  # a page's sound does not carry over to the next one
         self.stack.setCurrentIndex(index)
         log.info("page: %s", self.pages[index][0] if 0 <= index < len(self.pages) else index)
 
     def show_page(self, index: int) -> None:
-        """Affiche une page comme si on avait touché son bouton (sans son)."""
+        """Shows a page as if its button had been tapped (without sound)."""
         if 0 <= index < len(self.buttons):
             self.group.button(index).setChecked(True)
             self.stack.setCurrentIndex(index)
 
-    # --- Touches : Retour (Android), Échap, chiffres… ---------------------------------
+    # --- Keys: Back (Android), Esc, digits… --------------------------------------------
     def keyPressEvent(self, event) -> None:
         page = self.stack.currentWidget()
         if hasattr(page, "handle_key") and page.handle_key(event):
             event.accept()
             return
         if event.key() in (Qt.Key.Key_Back, Qt.Key.Key_Escape) and self.stack.currentIndex() != 0:
-            self.show_page(0)    # Retour depuis une autre page : la première page
+            self.show_page(0)    # Back from another page: the first page
             event.accept()
             return
         super().keyPressEvent(event)
 
-    # --- Arrière-plan (Android) ------------------------------------------------------
+    # --- Background (Android) ----------------------------------------------------------
     def on_app_state_changed(self, state) -> None:
-        """Branché sur QApplication.applicationStateChanged (voir main.py)."""
+        """Connected to QApplication.applicationStateChanged (see boot.py)."""
         log.info("app state: %s", getattr(state, "name", state))
         if state in PAUSED_STATES:
             self.pause_app()
@@ -165,20 +165,20 @@ class MainWindow(QMainWindow):
         return [self.stack.widget(i) for i in range(self.stack.count())]
 
     def pause_app(self) -> None:
-        """L'app passe en arrière-plan : on coupe le son, le micro et les
-        minuteries qui redessinent l'écran (sinon Qt dessine sur une surface
-        détruite : « eglSwapBuffers failed », écran noir au retour)."""
+        """The app goes to the background: stop the sound, the microphone and the
+        timers that redraw the screen (otherwise Qt draws on a destroyed
+        surface: "eglSwapBuffers failed", black screen when coming back)."""
         if self._app_paused:
             return
         self._app_paused = True
-        sound.playback().stop(fade=False)   # tout de suite : l'app ne tourne plus
+        sound.playback().stop(fade=False)   # right away: the app no longer runs
         for page in self._pages():
             if hasattr(page, "app_paused"):
                 page.app_paused()
 
     def resume_app(self) -> None:
-        """Retour au premier plan : on relance ce qui doit l'être et on
-        redessine tout sur la nouvelle surface."""
+        """Back to the foreground: restart what needs it and
+        redraw everything on the new surface."""
         if not self._app_paused:
             return
         self._app_paused = False
@@ -186,7 +186,7 @@ class MainWindow(QMainWindow):
             if hasattr(page, "app_resumed"):
                 page.app_resumed()
         self.update()
-        # la surface Android peut arriver juste après le signal : second passage
+        # the Android surface can arrive right after the signal: second pass
         QTimer.singleShot(250, self.update)
 
     def _refresh_icons(self, *_) -> None:

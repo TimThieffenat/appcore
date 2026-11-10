@@ -1,27 +1,27 @@
-"""Essai complet de l'interface d'une app, sans rien toucher : outil de développement.
+"""Full check of an app's interface, touching nothing: development tool.
 
-Depuis le dossier de l'app :
+From the app's folder:
 
     python appcore/tools/smoke_test.py
 
-Ouvre la fenêtre de l'app hors écran (format téléphone 850 × 390), en français,
-affiche chaque page du rail, le rapport d'erreur, puis la première page au
-format ordinateur, en sombre et en clair ; puis, dans chacune des autres
-langues de l'app, la première page et les réglages. Une capture de chaque écran
-est enregistrée dans build/smoke/. Le son est coupé (lecture « visuelle »). Les réglages
-utilisés sont à part (« <App>-smoke ») : les vrais ne sont pas touchés.
+Opens the app's window off screen (phone format 850 × 390), in English,
+shows each page of the rail, the error report, then the first page in
+desktop format, in dark and in light; then, in each of the app's other
+languages, the first page and the settings. A screenshot of each screen
+is saved in build/smoke/. Sound is off ("visual" playback). The settings
+used are separate ("<App>-smoke"): the real ones are not touched.
 
-La fenêtre est celle de l'app : `MainWindow` de son main.py s'il y en a une
-(sous-classe de celle du socle), sinon celle du socle.
+The window is the app's: the `MainWindow` of its main.py if there is one
+(subclass of the base's), else the base's.
 
-Si l'app a un fichier tools/smoke_extra.py, ses fonctions (toutes facultatives) :
-- prepare() : avant tout (données de test à part, par exemple un profil temporaire) ;
-- before_theme(theme) : avant de construire la fenêtre de chaque thème ;
-- tour(window, shot, pump, theme, log) : à chaque thème, après les pages
-  (parcours propre à l'app : une manche de jeu, un morceau…) ;
-- tour_language(window, shot, pump, code, log) : dans chaque autre langue.
+If the app has a tools/smoke_extra.py file, its functions (all optional):
+- prepare(): before anything (separate test data, for example a temporary profile);
+- before_theme(theme): before building the window of each theme;
+- tour(window, shot, pump, theme, log): for each theme, after the pages
+  (the app's own tour: a game round, a song…);
+- tour_language(window, shot, pump, code, log): in each other language.
 
-Toute erreur est écrite dans build/smoke/smoke.log (et le script s'arrête en erreur).
+Any error is written to build/smoke/smoke.log (and the script exits with an error).
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from pathlib import Path
 ROOT = Path.cwd()
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-if sys.platform == "win32":   # hors écran, Qt ne trouve pas seul les polices de Windows
+if sys.platform == "win32":   # off screen, Qt does not find Windows' fonts by itself
     os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"),
                                                          "Fonts"))
 OUT = ROOT / "build" / "smoke"
@@ -61,14 +61,14 @@ def _extra():
 
 def main() -> int:
     if not (ROOT / "app_info.py").is_file() or not (ROOT / "main.py").is_file():
-        raise SystemExit("à lancer depuis le dossier de l'app (celui de main.py et app_info.py)")
+        raise SystemExit("run from the app's folder (the one holding main.py and app_info.py)")
     OUT.mkdir(parents=True, exist_ok=True)
-    # Journal et rapport d'erreur de l'essai dans build/smoke/logs : ceux de la
-    # vraie app ne sont pas touchés (main.py installe le rapport en s'important)
+    # The check's log and error report go to build/smoke/logs: those of the
+    # real app are not touched (main.py installs the report when imported)
     from appcore import crash_report
     crash_report._dir = OUT / "logs"
     crash_report._dir.mkdir(parents=True, exist_ok=True)
-    import main as app_main   # les pages, la feuille de style et la préparation de l'app
+    import main as app_main   # the pages, the style sheet and the app's set-up
     from PySide6.QtCore import QCoreApplication, QSettings, QStandardPaths
     from PySide6.QtWidgets import QApplication
 
@@ -80,18 +80,18 @@ def main() -> int:
     window_class = getattr(app_main, "MainWindow", None) or MainWindow
 
     app = QApplication(sys.argv)
-    app.setOrganizationName(config.name() + "-smoke")    # réglages à part
+    app.setOrganizationName(config.name() + "-smoke")    # separate settings
     app.setApplicationName(config.name() + "-smoke")
-    QStandardPaths.setTestModeEnabled(True)               # dossiers de test
+    QStandardPaths.setTestModeEnabled(True)               # test folders
     QSettings().clear()
-    i18n.set_language("fr")
-    log(f"{config.name()} {config.version()} · langues {', '.join(i18n.LANGUAGES)}")
-    log(f"police de symboles : {symbol_font.install(app)} ({', '.join(symbol_font.families())})")
-    sound.playback().player.audio_ok = False             # silence : lecture visuelle
+    i18n.set_language("en")
+    log(f"{config.name()} {config.version()} · languages {', '.join(i18n.LANGUAGES)}")
+    log(f"symbols font: {symbol_font.install(app)} ({', '.join(symbol_font.families())})")
+    sound.playback().player.audio_ok = False             # silence: visual playback
     add_qss(getattr(app_main, "QSS", ""))
     extra = _extra()
     if extra is not None and hasattr(extra, "prepare"):
-        extra.prepare()            # avant setup : données de test (profil temporaire…)
+        extra.prepare()            # before setup: test data (temporary profile…)
     if callable(getattr(app_main, "setup", None)):
         app_main.setup(app)
 
@@ -102,14 +102,14 @@ def main() -> int:
     def shot(window, name: str) -> None:
         pump()
         window.grab().save(str(OUT / f"{name}.png"))
-        log(f"  capture {name}.png")
+        log(f"  screenshot {name}.png")
 
     def hook(name: str, *args) -> None:
         if extra is not None and hasattr(extra, name):
             getattr(extra, name)(*args)
 
     for theme in ("dark", "light"):
-        log(f"=== thème {theme}")
+        log(f"=== theme {theme}")
         hook("before_theme", theme)
         apply_theme(app, theme)
         window = window_class(app_main.pages())
@@ -121,28 +121,28 @@ def main() -> int:
             pump(5)
             shot(window, f"{theme}_{index:02d}_{label.lower().replace(' ', '_')}")
         if extra is not None and hasattr(extra, "tour"):
-            log("  parcours de l'app (tools/smoke_extra.py)")
+            log("  the app's tour (tools/smoke_extra.py)")
             window.show_page(0)
             hook("tour", window, shot, pump, theme, log)
-        # rapport d'erreur (Réglages › Rapport d'erreur) et adresse de l'e-mail
+        # error report (Settings › Error report) and email address
         report = crash_report.full_report()
         view = crash_report.show_over(window, report, i18n.tr("Error report"), can_clear=True)
-        shot(window, f"{theme}_90_rapport")
+        shot(window, f"{theme}_90_report")
         view.hide()
         view.deleteLater()
         url = crash_report.email_url(crash_report.full_report(compact=True), "test")
-        log(f"  rapport : {len(report)} caractères, adresse de l'e-mail : {len(url)} caractères")
+        log(f"  report: {len(report)} characters, email address: {len(url)} characters")
         window.show_page(0)
         window.resize(1280, 720)
         pump(5)
-        shot(window, f"{theme}_95_ordinateur")
+        shot(window, f"{theme}_95_desktop")
         window.close()
         window.deleteLater()
         pump(5)
-    # --- Les autres langues : la première page et les réglages
+    # --- The other languages: the first page and the settings
     apply_theme(app, "dark")
-    for code in [c for c in i18n.LANGUAGES if c not in ("en", "fr")]:
-        log(f"=== langue {code}")
+    for code in [c for c in i18n.LANGUAGES if c != "en"]:
+        log(f"=== language {code}")
         i18n.set_language(code)
         hook("before_theme", "dark")
         window = window_class(app_main.pages())
@@ -151,13 +151,13 @@ def main() -> int:
         pump(10)
         shot(window, f"lang_{code}_1_{window.pages[0][0].lower().replace(' ', '_')}")
         window.show_page(settings_index(window.pages))
-        shot(window, f"lang_{code}_2_reglages")
+        shot(window, f"lang_{code}_2_settings")
         window.show_page(0)
         hook("tour_language", window, shot, pump, code, log)
         window.close()
         window.deleteLater()
         pump(5)
-    i18n.set_language("fr")
+    i18n.set_language("en")
     crash_report.startup_done()
     log("OK")
     return 0
@@ -168,5 +168,5 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception:  # noqa: BLE001
         OUT.mkdir(parents=True, exist_ok=True)
-        log("ERREUR\n" + traceback.format_exc())
+        log("ERROR\n" + traceback.format_exc())
         sys.exit(1)

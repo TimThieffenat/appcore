@@ -1,184 +1,186 @@
-# appcore — le socle commun des apps
+# appcore — the shared base of the apps
 
-Le code partagé par **RiffFinder**, **PerfectPitch** et les apps à venir :
-Python + PySide6 (Qt), pensé pour un **téléphone en paysage** et utilisable sur
-ordinateur, compilé pour Android avec l'outil de Qt.
+The code shared by **RiffFinder**, **PerfectPitch** and the apps to come:
+Python + PySide6 (Qt), designed for a **phone in landscape** and usable on
+desktop, built for Android with Qt's tool.
 
-Chaque app l'inclut comme **sous-module git** dans son dossier `appcore/` et
-n'écrit que ce qui lui est propre. Une correction ici (rapport d'erreur, son,
-compilation Android…) sert à toutes les apps.
+Each app includes it as a **git submodule** in its `appcore/` folder and only
+writes what is its own. A fix here (error report, sound, Android build…)
+serves every app.
 
-## Ce que fournit le socle
+## What the base provides
 
-| Module | Rôle |
+| Module | Role |
 |---|---|
-| `boot.py` | le démarrage : rapport d'erreur installé en premier, langue, police de symboles, thème, fenêtre, reconstruction quand la langue change, reprise des données d'un ancien nom |
-| `main_window.py` | la fenêtre : rail d'icônes à gauche (taille ajustée à l'écran), pages à droite, pause / reprise en arrière-plan (Android), touche Retour |
-| `page_settings.py` | la page Réglages : langue, thème, noms des notes, instrument, rapport d'erreur ; chaque app y ajoute ses lignes |
-| `app.py` | ce que le socle sait de l'app : les constantes de son `app_info.py` (avec leurs valeurs par défaut) |
-| `i18n.py`, `locales/` | traductions : `tr()`, `ntr()` (pluriels), `N_()` ; 6 langues (en fr es it pt de) pour les textes du socle |
-| `crash_report.py` | journal de l'app et rapport d'erreur (erreurs Python, plantages natifs, causes d'arrêt d'Android), envoyé par e-mail en un geste |
-| `style.py` | thèmes clair (pastel) et sombre (néon), suivant le téléphone ; une app ajoute sa feuille de style |
-| `icons.py` | icônes dessinées en code (rail, cartes) ; une app enregistre les siennes |
-| `ui_common.py`, `touch_combo.py`, `touch_input.py` | outils d'interface tactile : listes déroulantes au doigt, champs avec « Terminé », rangées qui défilent, panneaux |
-| `sound.py`, `audio_player.py`, `guitar_synth.py`, `sounds/` | le son : guitares acier et nylon enregistrées, clavier doux synthétisé, mixage, lecture avec surlignage, cache |
-| `music_theory.py`, `chord_shapes.py` | notes, degrés, gammes, accords, accordages, Do Ré Mi / C D E ; formes d'accords jouables à la guitare (sans Qt) |
-| `symbol_font.py`, `symbol_font_data.py` | police de symboles intégrée (♭ ♯ → ✓ ★…) : jamais de carrés vides |
-| `app_signals.py` | signaux partagés : réglages changés, langue changée, données de l'utilisateur changées, version payante changée |
-| `android/` | toute la compilation Android : APK de test, AAB signé pour Google Play, correctifs de l'outil de Qt, allègement, pages de 16 Ko, activité Java (écran allumé, causes des arrêts, sélecteur de fichiers) — voir **ANDROID.md** |
-| `templates/github/workflows/` | les recettes GitHub Actions (APK, AAB, clé), les mêmes pour toutes les apps |
-| `template/` | le modèle d'une nouvelle app (voir plus bas) |
-| `tools/` | outils de développement : nouvelle app, vérification des traductions, essai de l'interface, police de symboles |
-| `tests/` | tests du socle, sans Qt |
+| `boot.py` | start-up: error report installed first, language, symbols font, theme, window, rebuilt when the language changes, data taken over from a former name |
+| `main_window.py` | the window: icon rail on the left (size adjusted to the screen), pages on the right, pause / resume in the background (Android), Back key |
+| `page_settings.py` | the Settings page: language, theme, note names, instrument, error report; each app adds its own rows |
+| `app.py` | what the base knows about the app: the constants of its `app_info.py` (with their default values) |
+| `i18n.py`, `locales/` | translations: `tr()`, `ntr()` (plurals), `N_()`; 6 languages (en fr es it pt de) for the base's texts |
+| `crash_report.py` | the app's log and error report (Python errors, native crashes, Android exit reasons), sent by email in one gesture |
+| `style.py` | light (pastel) and dark (neon) themes, following the phone; an app adds its own style sheet |
+| `icons.py` | icons drawn in code (rail, cards); an app registers its own |
+| `ui_common.py`, `touch_combo.py`, `touch_input.py` | touch interface tools: finger-friendly drop-down lists, fields with "Done", scrolling rows, panels |
+| `sound.py`, `audio_player.py`, `guitar_synth.py`, `sounds/` | sound: recorded steel and nylon guitars, synthesised soft keys, mixing, playback with highlighting, cache |
+| `music_theory.py`, `chord_shapes.py` | notes, degrees, scales, chords, tunings, Do Ré Mi / C D E; playable guitar chord shapes (no Qt) |
+| `symbol_font.py`, `symbol_font_data.py` | built-in symbols font (♭ ♯ → ✓ ★…): never empty boxes |
+| `app_signals.py` | shared signals: settings changed, language changed, user data changed, paid version changed |
+| `android/` | the whole Android build: test APK, signed AAB for Google Play, fixes to Qt's tool, slimming, 16 KB pages, Java activity (screen kept on, exit reasons, file picker) — see **ANDROID.md** |
+| `templates/github/workflows/` | the GitHub Actions workflows (APK, AAB, key), the same for every app |
+| `template/` | the template of a new app (see below) |
+| `tools/` | development tools: new app, translation check, interface check, symbols font |
+| `tests/` | tests of the base, without Qt |
 
-## Une app sur le socle
+## An app on the base
 
 ```
-MonApp/
-  appcore/            <- ce dépôt (sous-module git)
-  app_info.py         <- nom, version, langues, son, paquet Android, autorisations…
-  main.py             <- les pages du rail (pages()), la feuille de style (QSS)
-  android/java/       <- facultatif : le Java de l'app (AppHooks.java…)
-  page_*.py           <- les pages de l'app
-  page_settings.py    <- la page Réglages du socle + les réglages de l'app
-  icons.py            <- les icônes de l'app (enregistrées dans le socle)
-  locales/<code>.py   <- les traductions des textes de l'app
-  tools/i18n_data.py  <- les textes de ses tableaux de données (pour i18n_check)
-  tests/              <- ses tests sans Qt
-  store/, icon.png    <- fiche Google Play, icône
-  .github/workflows/  <- copies de appcore/templates/github/workflows/
+MyApp/
+  appcore/            <- this repository (git submodule)
+  app_info.py         <- name, version, languages, sound, Android package, permissions…
+  main.py             <- the rail's pages (pages()), the style sheet (QSS)
+  android/java/       <- optional: the app's Java (AppHooks.java…)
+  page_*.py           <- the app's pages
+  page_settings.py    <- the base's Settings page + the app's settings
+  icons.py            <- the app's icons (registered in the base)
+  locales/<code>.py   <- translations of the app's texts
+  tools/i18n_data.py  <- the texts of its data tables (for i18n_check)
+  tests/              <- its tests without Qt
+  store/, icon.png    <- Google Play listing, icon
+  .github/workflows/  <- copies of appcore/templates/github/workflows/
 ```
 
-### Les points d'accroche
+### The hooks
 
-- **`app_info.py`** : rien que des constantes (les scripts Android le lisent sans
-  lancer l'app). Toutes sont décrites dans `template/app_info.py` ; seul `NAME`
-  est obligatoire.
-- **`main.py`** :
+- **`app_info.py`**: nothing but constants (the Android scripts read it without
+  running the app). They are all described in `template/app_info.py`; only `NAME`
+  is required.
+- **`main.py`**:
   ```python
   import sys
-  from appcore import boot          # en premier : installe le rapport d'erreur
+  from appcore import boot          # first: installs the error report
 
   QSS = """QLabel#hero {{ font-size: 30px; color: {accent_text}; }}"""
 
-  def pages():                      # (libellé N_(), icône, classe de la page)
-      import icons                  # les icônes de l'app
+  def pages():                      # (N_() label, icon, page class)
+      import icons                  # the app's icons
       from appcore.i18n import N_
       from page_home import HomePage
       from page_settings import SettingsPage
       return [(N_("Home"), "home", HomePage), (N_("Settings"), "settings", SettingsPage)]
 
-  def setup(app):                   # facultatif : avant le thème et la fenêtre
+  def setup(app):                   # optional: before the theme and the window
       ...
 
   if __name__ == "__main__":
       sys.exit(boot.run(pages, qss=QSS, setup=setup))
   ```
-  `boot.run` accepte aussi `started(window)` (une fois la fenêtre affichée :
-  achats, rappels…), `on_language(code)` (quand la langue change, avant la
-  reconstruction de la fenêtre) et `window_class` (une sous-classe de
-  `appcore.main_window.MainWindow`, par exemple pour ouvrir une fiche depuis
-  n'importe quelle page, comme la fiche Pro de PerfectPitch).
-- **Une page** est un `QWidget` (objectName `"page"`) ; elle peut avoir
-  `app_paused()` / `app_resumed()` (arrière-plan) et `handle_key(event)`
-  (touches ; sinon Retour ramène à la première page). Elle écoute
-  `bus.settings_changed` pour suivre un réglage.
-- **Réglages** : sous-classe de `appcore.page_settings.SettingsPage`, qui
-  redéfinit `rows()` (l'ordre des lignes : `language_row()`, `theme_row()`,
-  `notation_row()`, `sound_row()`, `report_row()` et les siennes),
-  éventuellement `SOUND_LABEL`, `sound_demo()` et `credits()`. `save(clé,
-  valeur)` enregistre et prévient les pages. Pour un instrument réservé (version
-  payante…) : `voice_text(clé)` (son nom dans la liste), `voice_refused(clé)`
-  (ce qui se passe quand on le choisit sans y avoir droit) et, dans `sound.py`
-  de l'app, `set_voice_filter(fn)` ; `fill_sounds()` refait la liste.
-- **Icônes** : `register("nom", dessin)` dans `icons.py` de l'app ; le dessin
-  trace sur une grille de 24 × 24 avec le crayon déjà réglé.
-- **Feuille de style** : `QSS` de `main.py` (ou `style.add_qss()`), avec les
-  couleurs du thème entre accolades (`{accent_text}`, `{pink_soft}`, `{gold}`…,
-  voir `THEMES` dans `style.py`) et les accolades de la feuille doublées.
-- **Compléter un module du socle** : une app peut garder un module du même nom
-  qui reprend celui du socle et ajoute ses outils, par exemple le `ui_common.py`
-  de RiffFinder (capo, accordage, gaucher) ou le `sound.py` de PerfectPitch
-  (jouer une question) :
+  `boot.run` also accepts `started(window)` (once the window is shown:
+  purchases, reminders…), `on_language(code)` (when the language changes, before
+  the window is rebuilt) and `window_class` (a subclass of
+  `appcore.main_window.MainWindow`, for example to open a sheet from
+  any page, like PerfectPitch's Pro sheet).
+- **A page** is a `QWidget` (objectName `"page"`); it can have
+  `app_paused()` / `app_resumed()` (background) and `handle_key(event)`
+  (keys; otherwise Back returns to the first page). It listens to
+  `bus.settings_changed` to follow a setting.
+- **Settings**: a subclass of `appcore.page_settings.SettingsPage`, which
+  overrides `rows()` (the order of the rows: `language_row()`, `theme_row()`,
+  `notation_row()`, `sound_row()`, `report_row()` and its own),
+  possibly `SOUND_LABEL`, `sound_demo()` and `credits()`. `save(key,
+  value)` saves and notifies the pages. For a reserved instrument (paid
+  version…): `voice_text(key)` (its name in the list), `voice_refused(key)`
+  (what happens when it is chosen without the right to it) and, in the app's
+  `sound.py`, `set_voice_filter(fn)`; `fill_sounds()` rebuilds the list.
+- **Icons**: `register("name", drawer)` in the app's `icons.py`; the drawer
+  draws on a 24 × 24 grid with the pen already set.
+- **Style sheet**: `QSS` in `main.py` (or `style.add_qss()`), with the
+  theme's colours in braces (`{accent_text}`, `{pink_soft}`, `{gold}`…,
+  see `THEMES` in `style.py`) and the sheet's own braces doubled.
+- **Extending a base module**: an app can keep a module of the same name
+  that takes the base's one and adds its tools, for example RiffFinder's
+  `ui_common.py` (capo, tuning, left-handed) or PerfectPitch's `sound.py`
+  (play a question):
   ```python
-  from appcore.ui_common import *   # noqa: F403 — les outils du socle
+  from appcore.ui_common import *   # noqa: F403 — the base's tools
   def capo(settings): ...
   ```
-  Ailleurs, l'app importe le socle directement : `from appcore import i18n`,
+  Elsewhere, the app imports the base directly: `from appcore import i18n`,
   `from appcore.style import current_palette`…
-- **Traductions** : les textes du socle sont traduits dans `appcore/locales/`,
-  ceux de l'app dans son `locales/` ; une entrée de l'app remplace celle du
-  socle (PerfectPitch tutoie le joueur dans le rapport d'erreur, le socle
-  vouvoie).
-- **Son** : `sound.synth()` (l'instrument des réglages), `sound.playback()`,
-  `guitar_synth.Performance` (ce que l'app fabrique : PCM, durée, événements
-  pour surligner), `guitar_synth.arpeggio(...)` pour essayer un instrument,
-  `chord_shapes.best_voicing(...)` pour des accords de guitare jouables.
-- **Signaux** (`app_signals.bus`) : `settings_changed`, `language_changed`,
-  `profile_changed` (données de l'utilisateur), `pro_changed` (version payante).
-- **Android, côté Java** : une app peut avoir son Java dans
-  `android/java/<paquet>/` ; un `AppHooks.java` (méthodes statiques `onCreate`,
-  `onResume`, `onRequestPermissionsResult`) y est appelé par l'activité du
-  socle. Ses bibliothèques Java vont dans `GRADLE_DEPENDENCIES`, les
-  autorisations qu'elles ajoutent dans `LIBRARY_PERMISSIONS` (`app_info.py`).
-- **Essai de l'interface** : `tools/smoke_extra.py` de l'app ajoute son
-  parcours (`prepare()`, `before_theme(theme)`, `tour(...)`,
-  `tour_language(...)`, tous facultatifs, voir `tools/smoke_test.py`).
+- **Translations**: the base's texts are translated in `appcore/locales/`,
+  the app's in its `locales/`; an app entry replaces the base's
+  (PerfectPitch uses "tu" with the player in the French error report, the
+  base uses "vous").
+- **Sound**: `sound.synth()` (the instrument from the settings), `sound.playback()`,
+  `guitar_synth.Performance` (what the app builds: PCM, duration, events
+  to highlight), `guitar_synth.arpeggio(...)` to try an instrument,
+  `chord_shapes.best_voicing(...)` for playable guitar chords.
+- **Signals** (`app_signals.bus`): `settings_changed`, `language_changed`,
+  `profile_changed` (user data), `pro_changed` (paid version).
+- **Android, Java side**: an app can have its Java in
+  `android/java/<package>/`; an `AppHooks.java` there (static methods `onCreate`,
+  `onResume`, `onRequestPermissionsResult`) is called by the base's
+  activity. Its Java libraries go in `GRADLE_DEPENDENCIES`, the
+  permissions they add in `LIBRARY_PERMISSIONS` (`app_info.py`).
+- **Interface check**: the app's `tools/smoke_extra.py` adds its own
+  tour (`prepare()`, `before_theme(theme)`, `tour(...)`,
+  `tour_language(...)`, all optional, see `tools/smoke_test.py`).
 
-## Créer une nouvelle app
+## Creating a new app
 
 ```
-python appcore/tools/new_app.py MonApp D:\Projects\MonApp --description "A metronome trainer"
+python appcore/tools/new_app.py MyApp D:\Projects\MyApp --description "A metronome trainer"
 ```
 
-(depuis le dossier d'une app existante, ou du socle). Le modèle est copié avec
-le nom de l'app, les recettes GitHub ajoutées, et — si git est là — un dépôt
-créé avec le socle en sous-module (même adresse que le socle actuel). L'app
-démarre aussitôt (`python main.py`) : une page d'accueil d'exemple et les
-réglages. Ensuite : créer le dépôt sur GitHub, `git remote add origin …`,
-`git push -u origin main`, et dans l'app `python tools/make_icon.py`.
+(from the folder of an existing app, or of the base). The template is copied with
+the app's name, the GitHub workflows added, and — if git is there — a repository
+created with the base as a submodule (same URL as the current base). The app
+starts at once (`python main.py`, or double-click `run.bat`): an example home
+page and the settings. Next: create the repository on GitHub,
+`git remote add origin …`, `git push -u origin main`, and in the app
+`python tools/make_icon.py`.
 
-## Outils (depuis le dossier d'une app)
+## Tools (from an app's folder)
 
-| Commande | Rôle |
+| Command | Role |
 |---|---|
-| `appcore\tools\smoke_test.bat` | tout d'un coup (double-clic) : tests du socle et de l'app, traductions, essai de l'interface ; résultats dans `build\smoke\console.log` |
-| `python appcore/tools/smoke_test.py` | ouvre l'app hors écran (850 × 390), chaque page en sombre et en clair, le rapport d'erreur, le format ordinateur ; captures dans `build/smoke/` ; parcours propre à l'app dans `tools/smoke_extra.py` (facultatif) |
-| `python appcore/tools/i18n_check.py` | textes à traduire du socle et de l'app, ce qui manque, ce qui ne sert plus (`--list` : tous les textes de l'app, prêts à copier ; `--core` : le socle seul) |
-| `python -m unittest discover -s appcore/tests -t .` | tests du socle |
-| `python appcore/tools/build_font.py` | refait la police de symboles de l'app (`--core` : celle du socle) ; fonttools et DejaVu Sans nécessaires |
-| `bash appcore/android/build_apk.sh` | APK (Linux / WSL), voir ANDROID.md |
+| `appcore\tools\smoke_test.bat` | everything at once (double-click): tests of the base and of the app, translations, interface check; results in `build\smoke\console.log` |
+| `python appcore/tools/smoke_test.py` | opens the app off screen (850 × 390), each page in dark and in light, the error report, the desktop format, then each other language; screenshots in `build/smoke/`; the app's own tour in `tools/smoke_extra.py` (optional) |
+| `python appcore/tools/i18n_check.py` | the base's and the app's texts to translate, what is missing, what is no longer used (`--list`: all the app's texts, ready to paste; `--core`: the base alone) |
+| `python -m unittest discover -s appcore/tests -t .` | tests of the base |
+| `python appcore/tools/build_font.py` | rebuilds the app's symbols font (`--core`: the base's); needs fonttools and DejaVu Sans |
+| `bash appcore/android/build_apk.sh` | APK (Linux / WSL), see ANDROID.md |
 
-## Modifier le socle
+## Changing the base
 
-Le socle se modifie depuis n'importe quelle app, dans son dossier `appcore/` :
+The base is changed from any app, in its `appcore/` folder:
 
 ```
 cd D:\Projects\RiffFinder\appcore
-(modifier, tester avec appcore\tools\smoke_test.bat)
-git commit -am "Rapport d'erreur : …"
+(change, test with appcore\tools\smoke_test.bat)
+git commit -am "Error report: …"
 git push
 cd ..
-git commit -am "appcore à jour"         (l'app retient la nouvelle version du socle)
+git commit -am "Update appcore"          (the app records the new version of the base)
 ```
 
-Puis dans les autres apps :
+Then in the other apps:
 
 ```
 cd D:\Projects\PerfectPitch
-git submodule update --remote appcore    (la dernière version du socle)
-appcore\tools\smoke_test.bat             (vérifier)
-git commit -am "appcore à jour"
+git submodule update --remote appcore    (the latest version of the base)
+appcore\tools\smoke_test.bat             (check)
+git commit -am "Update appcore"
 ```
 
-Chaque app garde la version du socle qu'elle a retenue : une app publiée ne
-change pas tant qu'on ne met pas son socle à jour. Après un clone d'une app :
-`git clone --recurse-submodules <adresse>`, ou `git submodule update --init`.
+Each app keeps the version of the base it recorded: a published app does not
+change until its base is updated. After cloning an app:
+`git clone --recurse-submodules <url>`, or `git submodule update --init`.
 
-Règles pour que le socle reste partageable :
-- rien de propre à une app dans `appcore/` : ce qui varie passe par
-  `app_info.py` ou par un point d'accroche (pages, `rows()`, `register`, `QSS`…) ;
-- un texte affiché passe par `tr()` et se traduit dans `appcore/locales/`
-  (les 5 langues : `python appcore/tools/i18n_check.py --core`) ;
-- un changement qui casse une app (nom de fonction, réglage) se fait dans
-  toutes les apps en même temps, ou garde l'ancien nom.
+Rules to keep the base shareable:
+- nothing specific to one app in `appcore/`: what varies goes through
+  `app_info.py` or through a hook (pages, `rows()`, `register`, `QSS`…);
+- displayed text goes through `tr()` and is translated in `appcore/locales/`
+  (the 5 languages: `python appcore/tools/i18n_check.py --core`);
+- code, comments and documentation of the base are written in English;
+- a change that breaks an app (function name, setting) is made in
+  all apps at the same time, or keeps the old name.

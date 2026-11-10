@@ -1,12 +1,12 @@
-"""Autorisations Android déclarées par un APK (lues dans son AndroidManifest.xml).
+"""Android permissions declared by an APK (read from its AndroidManifest.xml).
 
     python appcore/android/apk_permissions.py dist/RiffFinder.apk
 
-build_apk.sh le lance à la fin de chaque compilation : il affiche les
-autorisations de l'APK et prévient si l'une d'elles n'est pas attendue
-(ANDROID_PERMISSIONS de app_info.py, que build_apk.sh passe dans APPCORE_PERMISSIONS)
-(par exemple si une mise à jour de l'outil de Qt en remet une inutile, voir le
-correctif « permissions » de patch_deploy_tools.py). N'a besoin que de Python.
+build_apk.sh runs it at the end of each build: it shows the APK's
+permissions and warns if one of them is not expected
+(ANDROID_PERMISSIONS of app_info.py, which build_apk.sh passes in APPCORE_PERMISSIONS)
+(for example if an update of Qt's tool adds a useless one back, see the
+"permissions" fix in patch_deploy_tools.py). Only needs Python.
 """
 
 from __future__ import annotations
@@ -16,13 +16,13 @@ import struct
 import sys
 import zipfile
 
-# Les seules dont l'app se sert (voir patch_deploy_tools.py, correctif 2b bis)
-# + celles qu'ajoutent les bibliothèques Java de l'app (LIBRARY_PERMISSIONS de
-# app_info.py : BILLING pour Google Play Billing, WAKE_LOCK pour WorkManager…)
+# The only ones the app uses (see patch_deploy_tools.py, fix 2b bis)
+# + those added by the app's Java libraries (LIBRARY_PERMISSIONS of
+# app_info.py: BILLING for Google Play Billing, WAKE_LOCK for WorkManager…)
 EXPECTED = {p.strip() for p in (os.environ.get(
     "APPCORE_PERMISSIONS", "android.permission.MODIFY_AUDIO_SETTINGS") + ","
     + os.environ.get("APPCORE_EXPECTED_PERMISSIONS", "")).split(",") if p.strip()}
-# Ajoutées par AndroidX à son propre nom (paquet de l'app + suffixe) : sans risque
+# Added by AndroidX under its own name (app package + suffix): harmless
 EXPECTED_SUFFIXES = (".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",)
 
 _STRING_POOL, _START_ELEMENT = 0x0001, 0x0102
@@ -30,7 +30,7 @@ _TYPE_STRING = 0x03
 
 
 def _strings(data: bytes, offset: int) -> list[str]:
-    """Table des textes du XML binaire d'Android (UTF-8 ou UTF-16)."""
+    """String table of Android's binary XML (UTF-8 or UTF-16)."""
     header_size, = struct.unpack_from("<H", data, offset + 2)
     count, _styles, flags, start, _ = struct.unpack_from("<IIIII", data, offset + 8)
     utf8 = bool(flags & 0x100)
@@ -39,7 +39,7 @@ def _strings(data: bytes, offset: int) -> list[str]:
     for item in offsets:
         p = offset + start + item
         if utf8:
-            p += 2 if data[p] & 0x80 else 1           # longueur en caractères
+            p += 2 if data[p] & 0x80 else 1           # length in characters
             n = data[p]
             p += 1
             if n & 0x80:
@@ -57,10 +57,10 @@ def _strings(data: bytes, offset: int) -> list[str]:
 
 
 def manifest_permissions(manifest: bytes) -> list[str]:
-    """Noms des <uses-permission> d'un AndroidManifest.xml binaire."""
+    """Names of the <uses-permission> of a binary AndroidManifest.xml."""
     strings: list[str] = []
     found = []
-    pos = 8                                   # après l'en-tête du fichier
+    pos = 8                                   # after the file header
     while pos + 8 <= len(manifest):
         kind, _header, size = struct.unpack_from("<HHI", manifest, pos)
         if size <= 0:
@@ -94,14 +94,14 @@ def main() -> int:
         return 2
     for apk in sys.argv[1:]:
         permissions = apk_permissions(apk)
-        print(f"Autorisations de {apk.rsplit('/', 1)[-1]} :")
+        print(f"Permissions of {apk.rsplit('/', 1)[-1]}:")
         for name in permissions or ["(aucune)"]:
             print(f"  {name}")
         extra = sorted(name for name in set(permissions) - EXPECTED
                        if not name.endswith(EXPECTED_SUFFIXES))
         if extra:
-            print("\033[1;33mATTENTION : autorisations inattendues (voir le correctif "
-                  "« permissions » de android/patch_deploy_tools.py) :\033[0m")
+            print("\033[1;33mWARNING: unexpected permissions (see the "
+                  "\"permissions\" fix in android/patch_deploy_tools.py):\033[0m")
             for name in extra:
                 print(f"  {name}")
     return 0

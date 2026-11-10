@@ -1,13 +1,13 @@
-"""Génère l'icône de l'app et les images de la fiche Google Play (point de départ
-à personnaliser : dégradé du thème, initiale de l'app). Depuis le dossier de l'app :
+"""Generates the app's icon and the Google Play listing images (a starting point
+to customise: theme gradient, the app's initial). From the app's folder:
 
     pip install pillow
     python tools/make_icon.py
 
-Écrit :
-- icon.png                           512 × 512, coins arrondis transparents (app, APK)
-- store/play_icon_512.png            512 × 512, carré plein (Google Play arrondit lui-même)
-- store/feature_graphic_1024x500.png bannière de la fiche Google Play
+Writes:
+- icon.png                           512 × 512, transparent rounded corners (app, APK)
+- store/play_icon_512.png            512 × 512, full square (Google Play rounds it itself)
+- store/feature_graphic_1024x500.png Google Play listing banner
 """
 
 from pathlib import Path
@@ -16,9 +16,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 SIZE = 512
-SS = 4                        # sur-échantillonnage pour des bords lisses
-TOP_LEFT = (0x4C, 0xBF, 0xB3)       # turquoise (thème clair, style.py)
-BOTTOM_RIGHT = (0xF0, 0x8F, 0xB0)   # rose
+SS = 4                        # supersampling for smooth edges
+TOP_LEFT = (0x4C, 0xBF, 0xB3)       # turquoise (light theme, style.py)
+BOTTOM_RIGHT = (0xF0, 0x8F, 0xB0)   # pink
 
 
 def _name() -> str:

@@ -1,7 +1,7 @@
-"""Textes des tableaux de données de l'app, pour appcore/tools/i18n_check.py.
+"""Texts of the app's data tables, for appcore/tools/i18n_check.py.
 
-Les noms d'une bibliothèque (styles, niveaux, trophées…) se déclarent ici,
-directement depuis leurs modules, sans avoir à les marquer un par un :
+The names of a library (styles, levels, trophies…) are declared here,
+straight from their modules, without having to mark them one by one:
 
     def texts(add):
         import levels

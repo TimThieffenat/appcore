@@ -1,5 +1,5 @@
-// Modèle du socle (appcore/android/java/) : build_apk.sh y met le paquet Java,
-// le nom de l'app (app_info.py) et le range dans le dossier de son paquet.
+// Base template (appcore/android/java/): build_apk.sh fills in the Java package
+// and the app's name (app_info.py) and puts it in its package's folder.
 package @JAVA_PACKAGE@;
 
 import android.content.Intent;
@@ -12,34 +12,34 @@ import java.lang.reflect.Method;
 import org.kivy.android.PythonActivity;
 
 /**
- * Activité principale de l'app : celle de python-for-android (Qt), plus trois
- * choses :
+ * The app's main activity: python-for-android's (Qt), plus a few
+ * things:
  *
- * - l'écran reste allumé tant que l'app est affichée, comme pendant une vidéo.
- *   Android l'éteint normalement dès qu'on passe à une autre app ou qu'on la
- *   met en arrière-plan (le réglage ne vaut que pour cette fenêtre, il ne
- *   demande aucune autorisation et ne consomme rien quand l'app est cachée) ;
- * - avant de lancer Python, les causes des derniers arrêts de l'app
- *   (plantage, « ne répond pas »…) sont notées pour le rapport d'erreur
- *   (voir ExitReasons et crash_report.py) ;
- * - les crochets de l'app (AppHooks, dans son android/java/ : achat dans l'app,
- *   notifications…) à la création, au retour au premier plan et à la réponse
- *   d'une demande d'autorisation ; toujours protégés par try/catch : une erreur
- *   de l'app ne doit jamais empêcher l'activité de démarrer ;
- * - le résultat du sélecteur de fichiers d'Android est transmis à Qt.
- *   L'activité de python-for-android (PythonActivity.onActivityResult)
- *   l'intercepte sans appeler celle de Qt : QFileDialog n'apprenait jamais
- *   quel fichier avait été choisi. Le sélecteur créait le fichier, vide, et
- *   l'app attendait pour toujours (gel avec exec(), rien du tout avec open()).
+ * - the screen stays on while the app is shown, as during a video.
+ *   Android turns it off as usual as soon as you switch to another app or
+ *   put it in the background (the setting only applies to this window, it
+ *   needs no permission and costs nothing when the app is hidden);
+ * - before Python starts, the reasons for the app's last exits
+ *   (crash, "not responding"…) are recorded for the error report
+ *   (see ExitReasons and crash_report.py);
+ * - the app's hooks (AppHooks, in its android/java/: in-app purchase,
+ *   notifications…) at creation, when coming back to the foreground and on the
+ *   answer to a permission request; always guarded by try/catch: an error
+ *   in the app must never stop the activity from starting;
+ * - the result of Android's file picker is passed on to Qt.
+ *   python-for-android's activity (PythonActivity.onActivityResult)
+ *   intercepts it without calling Qt's: QFileDialog never learned
+ *   which file had been chosen. The picker created the file, empty, and
+ *   the app waited forever (freeze with exec(), nothing at all with open()).
  */
 public class KeepAwakeActivity extends PythonActivity {
     private static final String TAG = "@APP_NAME@";
-    private static Method qtActivityResult;   // QtNative.onActivityResult (privé au paquet de Qt)
+    private static Method qtActivityResult;   // QtNative.onActivityResult (private to Qt's package)
     private static boolean qtLookupDone = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        ExitReasons.save(this);   // avant super.onCreate : Python lit le fichier au démarrage
+        ExitReasons.save(this);   // before super.onCreate: Python reads the file at start-up
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         try {
@@ -72,11 +72,11 @@ public class KeepAwakeActivity extends PythonActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);   // écouteurs de python-for-android
+        super.onActivityResult(requestCode, resultCode, data);   // python-for-android's listeners
         forwardToQt(requestCode, resultCode, data);
     }
 
-    /** Ce que fait QtActivityBase.onActivityResult, que PythonActivity n'appelle pas. */
+    /** What QtActivityBase.onActivityResult does, which PythonActivity does not call. */
     private static void forwardToQt(int requestCode, int resultCode, Intent data) {
         try {
             if (!qtLookupDone) {
@@ -92,7 +92,7 @@ public class KeepAwakeActivity extends PythonActivity {
             } else {
                 Log.w(TAG, "activity result not forwarded to Qt (method not found)");
             }
-        } catch (Throwable error) {   // ne jamais faire planter l'app pour ça
+        } catch (Throwable error) {   // never crash the app for this
             Log.w(TAG, "activity result not forwarded to Qt", error);
         }
     }

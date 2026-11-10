@@ -1,8 +1,8 @@
-"""Tests du socle, sans Qt. Depuis le dossier d'une app :
+"""Tests of the base, without Qt. From an app's folder:
 
     python -m unittest discover -s appcore/tests -t .
 
-(ou depuis le dépôt du socle seul : python -m unittest discover -s tests -t ..)
+(or from the base's repository alone: python -m unittest discover -s tests -t ..)
 """
 
 from __future__ import annotations
@@ -98,9 +98,9 @@ class TranslationTests(unittest.TestCase):
             sys.path.insert(0, tmp)
             try:
                 catalog = i18n.catalog_for("fr")
-                self.assertEqual(catalog["Settings"], "Paramètres")    # l'app remplace le socle
+                self.assertEqual(catalog["Settings"], "Paramètres")    # the app replaces the base
                 self.assertEqual(catalog["Hello"], "Bonjour")
-                self.assertEqual(catalog["Error report"], "Rapport d'erreur")   # le socle
+                self.assertEqual(catalog["Error report"], "Rapport d'erreur")   # the base
             finally:
                 sys.path.remove(tmp)
                 for name in ("locales", "locales.fr"):

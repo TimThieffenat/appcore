@@ -1,9 +1,9 @@
-"""Page « Settings » du socle : langue, thème, noms des notes, son, rapport
-d'erreur, et les réglages propres à l'app.
+"""The base's "Settings" page: language, theme, note names, sound, error
+report, and the app's own settings.
 
-Chaque app en fait une sous-classe (son page_settings.py) qui ajoute ses
-lignes en redéfinissant rows(), et éventuellement sound_demo(), credits(),
-voice_text() / voice_refused() (instrument réservé à la version Pro…) :
+Each app makes a subclass of it (its page_settings.py) that adds its
+rows by overriding rows(), and possibly sound_demo(), credits(),
+voice_text() / voice_refused() (instrument reserved to the Pro version…):
 
     class SettingsPage(BaseSettingsPage):
         SOUND_LABEL = N_("Guitar sound")
@@ -14,8 +14,8 @@ voice_text() / voice_refused() (instrument réservé à la version Pro…) :
             return [self.language_row(), self.theme_row(), self.notation_row(),
                     (tr("Capo"), self.capo_box), self.sound_row(), self.report_row()]
 
-Les lignes se règlent avec save(clé, valeur) : le réglage est enregistré,
-écrit dans le journal, et les pages redessinées (bus.settings_changed).
+Rows are set with save(key, value): the setting is saved,
+written to the log, and the pages redrawn (bus.settings_changed).
 """
 
 from __future__ import annotations
@@ -48,8 +48,8 @@ log = logging.getLogger(__name__)
 
 
 class SettingsPage(QWidget):
-    SOUND_LABEL = N_("Instrument")   # libellé de la ligne du son (traduit à l'affichage)
-    CARD_WIDTH = 520                 # largeur maximale de la carte des réglages
+    SOUND_LABEL = N_("Instrument")   # label of the sound row (translated when shown)
+    CARD_WIDTH = 520                 # maximum width of the settings card
 
     def __init__(self) -> None:
         super().__init__()
@@ -71,7 +71,7 @@ class SettingsPage(QWidget):
         about.setWordWrap(True)
         about.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Une carte centrée, de largeur limitée : lisible sur tous les écrans
+        # A centred card of limited width: readable on every screen
         card = QFrame()
         card.setObjectName("sidePanel")
         card.setMaximumWidth(self.CARD_WIDTH)
@@ -97,9 +97,9 @@ class SettingsPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(ui.scroll_area(content))
 
-    # --- Les lignes ---------------------------------------------------------------------
+    # --- Rows ------------------------------------------------------------------------------
     def rows(self) -> list[tuple[str, QWidget]]:
-        """Les lignes de la carte, dans l'ordre : (libellé traduit, contrôle)."""
+        """The card's rows, in order: (translated label, control)."""
         return [self.language_row(), self.theme_row(), self.notation_row(),
                 self.sound_row(), self.report_row()]
 
@@ -108,7 +108,7 @@ class SettingsPage(QWidget):
         phone = i18n.LANGUAGES[i18n.system_language()]
         box.addItem(tr("Same as phone ({language})", language=phone), i18n.SYSTEM)
         for code, name in i18n.LANGUAGES.items():
-            box.addItem(name, code)    # chaque langue dans sa langue
+            box.addItem(name, code)    # each language in its own language
         box.setCurrentIndex(max(0, box.findData(str(self.settings.value("language", i18n.SYSTEM)))))
         box.currentIndexChanged.connect(self._on_language)
         self.language_box = box
@@ -139,7 +139,7 @@ class SettingsPage(QWidget):
         return tr(self.SOUND_LABEL), self.sound_box
 
     def fill_sounds(self) -> None:
-        """(Re)remplit la liste des instruments (après un achat, par exemple)."""
+        """(Re)fills the list of instruments (after a purchase, for example)."""
         box = self.sound_box
         box.blockSignals(True)
         box.clear()
@@ -149,12 +149,12 @@ class SettingsPage(QWidget):
         box.blockSignals(False)
 
     def voice_text(self, key: str) -> str:
-        """Le texte d'un instrument dans la liste."""
+        """The text of an instrument in the list."""
         return tr(VOICES[key][0])
 
     def voice_refused(self, key: str) -> None:
-        """On a choisi un instrument non permis (sound.set_voice_filter) :
-        la liste revient à l'instrument d'avant ; l'app peut proposer l'achat."""
+        """A non-allowed instrument was chosen (sound.set_voice_filter):
+        the list goes back to the previous instrument; the app can offer the purchase."""
 
     def report_row(self) -> tuple[str, QWidget]:
         button = QPushButton(tr("Show"))
@@ -166,24 +166,24 @@ class SettingsPage(QWidget):
         return tr("Error report"), button
 
     def credits(self) -> str:
-        """Les crédits sous la carte (sons, police…)."""
+        """The credits under the card (sounds, font…)."""
         return tr("Guitars: FluidR3_GM by Frank Wen (CC BY 3.0) · "
                   "Symbols: DejaVu Sans (Bitstream Vera license)")
 
     def sound_demo(self) -> None:
-        """Fait entendre l'instrument qu'on vient de choisir (un accord de do
-        majeur arpégé). Une app peut jouer autre chose."""
+        """Plays the instrument just chosen (an arpeggiated C major
+        chord). An app can play something else."""
         sound.playback().play(arpeggio(sound.synth(), (48, 55, 60, 64, 67)), self)
 
-    # --- Enregistrement -------------------------------------------------------------------
+    # --- Saving ----------------------------------------------------------------------------
     def save(self, key: str, value) -> None:
-        """Enregistre un réglage et prévient les pages (bus.settings_changed)."""
+        """Saves a setting and notifies the pages (bus.settings_changed)."""
         self.settings.setValue(key, value)
         log.info("setting %s = %s", key, value)
         bus.settings_changed.emit()
 
     def _on_language(self, *_) -> None:
-        """Autre langue : la fenêtre est refaite dans cette langue (boot.py)."""
+        """Another language: the window is rebuilt in that language (boot.py)."""
         choice = self.language_box.currentData()
         self.settings.setValue("language", choice)
         log.info("setting language = %s", choice)
@@ -193,10 +193,10 @@ class SettingsPage(QWidget):
             bus.language_changed.emit()
 
     def _on_sound(self, *_) -> None:
-        """Autre instrument : on l'enregistre, on prépare ses notes et on le fait entendre."""
+        """Another instrument: save it, prepare its notes and play it."""
         voice = self.sound_box.currentData()
         if not sound.voice_allowed(voice):
-            self.fill_sounds()            # remet l'instrument d'avant
+            self.fill_sounds()            # back to the previous instrument
             self.voice_refused(voice)
             return
         key = sound.setting_key()

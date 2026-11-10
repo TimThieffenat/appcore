@@ -11,7 +11,7 @@ controls, symbols font and the whole Android build come from there.
 ```
 git submodule update --init      # once, after cloning (fetches appcore/)
 pip install -r requirements.txt
-python main.py                   # or double-click lancer.bat
+python main.py                   # or double-click run.bat
 ```
 
 Checks (no phone needed): `appcore\tools\smoke_test.bat` (double-click) runs
@@ -46,5 +46,5 @@ cd appcore
 git pull                 # the latest base
 cd ..
 git add appcore
-git commit -m "appcore à jour"
+git commit -m "Update appcore"
 ```

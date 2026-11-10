@@ -1,33 +1,33 @@
-"""Allège l'APK / AAB : retire les bibliothèques Qt et les modules PySide6 dont
-l'app ne se sert pas.
+"""Slims the APK / AAB down: removes the Qt libraries and PySide6 modules the
+app does not use.
 
-La recette PySide6 de l'outil de Qt copie TOUTE la roue PySide6 dans l'app :
+The PySide6 recipe of Qt's tool copies the WHOLE PySide6 wheel into the app:
 
-- dans le dossier des bibliothèques natives (libs/<abi>/) : toutes les
-  bibliothèques Qt (3D, Charts, Pdf, Quick, Designer…), alors que Qt n'en
-  charge que quelques-unes (liste « qt_libs » de libs.xml) ;
-- dans le paquet Python (site-packages, compressé dans libpybundle.so puis
-  décompressé au premier lancement) : une deuxième copie de toutes ces
-  bibliothèques (PySide6/Qt/lib), les plugins, le QML, les traductions de Qt
-  et tous les modules Python (Qt3D, QtCharts…).
+- in the native library folder (libs/<abi>/): all Qt
+  libraries (3D, Charts, Pdf, Quick, Designer…), while Qt only
+  loads a few of them ("qt_libs" list of libs.xml);
+- in the Python package (site-packages, compressed into libpybundle.so then
+  unpacked at first start): a second copy of all these
+  libraries (PySide6/Qt/lib), the plugins, QML, Qt's translations
+  and all Python modules (Qt3D, QtCharts…).
 
-Ce script garde :
+This script keeps:
 
-- dans libs/ : les bibliothèques que Qt charge (modules, bibliothèques locales,
-  plugins) et tout ce dont elles ont besoin, trouvé en lisant leurs dépendances
-  ELF (DT_NEEDED) ; les bibliothèques qui ne viennent pas de Qt (Python, ssl…)
-  ne sont pas touchées ;
-- dans site-packages/PySide6 : __init__, les modules Python de la liste et
-  libpyside6. Le dossier Qt/ (copies des bibliothèques, plugins, QML,
-  traductions) part entièrement : sur Android, Qt charge ses bibliothèques
-  et ses plugins depuis libs/, jamais depuis là.
+- in libs/: the libraries Qt loads (modules, local libraries,
+  plugins) and everything they need, found by reading their ELF
+  dependencies (DT_NEEDED); libraries that do not come from Qt (Python, ssl…)
+  are not touched;
+- in site-packages/PySide6: __init__, the Python modules of the list and
+  libpyside6. The Qt/ folder (copies of the libraries, plugins, QML,
+  translations) goes entirely: on Android, Qt loads its libraries
+  and plugins from libs/, never from there.
 
-Appelé par la recette PySide6 (correctif « slim » de patch_deploy_tools.py),
-juste après la copie de la roue. Utilisable seul pour essayer :
+Called by the PySide6 recipe ("slim" fix of patch_deploy_tools.py),
+right after the wheel is copied. Can be used alone to try it:
 
     python android/slim_bundle.py <site-packages> <libs/arm64-v8a> Core,Gui,Widgets,...
 
-N'a besoin que de Python.
+Only needs Python.
 """
 
 from __future__ import annotations
@@ -37,20 +37,20 @@ import struct
 import sys
 from pathlib import Path
 
-# Toujours gardés dans site-packages/PySide6 (petits, ou lus par PySide6 lui-même)
+# Always kept in site-packages/PySide6 (small, or read by PySide6 itself)
 KEEP_FILES = {"__init__.py", "__init__.pyc", "_config.py", "_config.pyc",
               "_git_pyside_version.py", "_git_pyside_version.pyc", "py.typed",
               "libpyside6.abi3.so"}
-KEEP_DIRS = {"support", "lib"}   # petits : code Python de PySide6
+KEEP_DIRS = {"support", "lib"}   # small: PySide6's Python code
 
 
 def needed(path: Path) -> list[str]:
-    """Bibliothèques demandées par un fichier ELF 64 bits (DT_NEEDED)."""
+    """Libraries required by a 64-bit ELF file (DT_NEEDED)."""
     try:
         data = path.read_bytes()
     except OSError:
         return []
-    if data[:4] != b"\x7fELF" or data[4] != 2:   # ELF 64 bits seulement (arm64)
+    if data[:4] != b"\x7fELF" or data[4] != 2:   # 64-bit ELF only (arm64)
         return []
     little = data[5] == 1
     e = "<" if little else ">"
@@ -95,7 +95,7 @@ def needed(path: Path) -> list[str]:
 
 
 def closure(roots: list[Path], search: list[Path]) -> set[str]:
-    """Noms des bibliothèques atteintes depuis `roots` (en suivant DT_NEEDED)."""
+    """Names of the libraries reached from `roots` (following DT_NEEDED)."""
     seen: set[str] = set()
     todo = list(roots)
     while todo:
@@ -110,26 +110,26 @@ def closure(roots: list[Path], search: list[Path]) -> set[str]:
             if found is not None:
                 todo.append(found)
             else:
-                seen.add(name)   # bibliothèque du système (libc, liblog…)
+                seen.add(name)   # system library (libc, liblog…)
     return seen
 
 
 def slim(site_packages: Path, libs_dir: Path, modules: list[str],
          local_libs: list[str] = (), plugins: list[str] = (), arch: str = "arm64-v8a",
          log=print) -> tuple[int, int]:
-    """Allège ; renvoie (octets retirés de libs, octets retirés de site-packages)."""
+    """Slims down; returns (bytes removed from libs, bytes removed from site-packages)."""
     pyside = site_packages / "PySide6"
     qt_lib = pyside / "Qt" / "lib"
     from_qt = {p.name for p in qt_lib.glob("*.so")} if qt_lib.is_dir() else set()
     modules = sorted(set(modules))
-    # Ce que Qt charge au démarrage (libs.xml), plus les modules Python gardés
+    # What Qt loads at start-up (libs.xml), plus the Python modules kept
     roots = []
     for module in modules:
         roots += [libs_dir / f"libQt6{module}_{arch}.so", pyside / f"Qt{module}.abi3.so"]
     roots += [libs_dir / f"lib{name}_{arch}.so" for name in local_libs]
     roots += [libs_dir / f"lib{name}" if name.endswith(".so") else libs_dir / f"lib{name}_{arch}.so"
               for name in plugins]
-    roots += list(libs_dir.glob("libplugins_*.so"))   # tous les plugins copiés par l'outil
+    roots += list(libs_dir.glob("libplugins_*.so"))   # all plugins copied by the tool
     roots += [pyside / "libpyside6.abi3.so"]
     if "Qml" in modules:
         roots.append(pyside / "libpyside6qml.abi3.so")
@@ -161,16 +161,16 @@ def slim(site_packages: Path, libs_dir: Path, modules: list[str],
         for path in sorted(pyside.iterdir()):
             if path.is_dir():
                 if path.name not in KEEP_DIRS:
-                    drop(path)   # Qt/ (bibliothèques, plugins, QML, traductions), include, jar…
+                    drop(path)   # Qt/ (libraries, plugins, QML, translations), include, jar…
             elif path.name not in KEEP_FILES and path.name not in wanted:
-                drop(path)       # modules inutilisés, fichiers .pyi
-    for extra in ("include", "lib"):   # shiboken6 : en-têtes C++, outils de compilation
+                drop(path)       # unused modules, .pyi files
+    for extra in ("include", "lib"):   # shiboken6: C++ headers, build tools
         if (site_packages / "shiboken6" / extra).is_dir() and extra == "include":
             drop(site_packages / "shiboken6" / extra)
     for stub in site_packages.glob("shiboken6/*.pyi"):
         drop(stub)
-    log(f"  libs : {removed_libs / 1e6:.1f} Mo retirés, site-packages : "
-        f"{removed_site / 1e6:.1f} Mo retirés")
+    log(f"  libs: {removed_libs / 1e6:.1f} MB removed, site-packages: "
+        f"{removed_site / 1e6:.1f} MB removed")
     return removed_libs, removed_site
 
 

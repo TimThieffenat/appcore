@@ -1,1 +1,1 @@
-"""Traductions des textes du socle : un fichier par langue (voir appcore/i18n.py)."""
+"""Translations of the base's texts: one file per language (see appcore/i18n.py)."""

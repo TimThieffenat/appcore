@@ -1,14 +1,14 @@
-"""Signaux partagés entre les pages (ex. : les réglages ont changé)."""
+"""Signals shared between pages (e.g. the settings changed)."""
 
 from PySide6.QtCore import QObject, Signal
 
 
 class _Bus(QObject):
-    settings_changed = Signal()   # un réglage a changé : les pages se redessinent
-    language_changed = Signal()   # boot.py refait la fenêtre dans la nouvelle langue
-    profile_changed = Signal()    # les données de l'utilisateur ont changé (progression,
-                                  # favoris…) : les pages qui les montrent se mettent à jour
-    pro_changed = Signal()        # achat dans l'app (version Pro) : acquis, prix ou état
+    settings_changed = Signal()   # a setting changed: pages redraw
+    language_changed = Signal()   # boot.py rebuilds the window in the new language
+    profile_changed = Signal()    # the user's data changed (progress,
+                                  # favourites…): pages showing it update
+    pro_changed = Signal()        # in-app purchase (Pro version): owned, price or state
 
 
 bus = _Bus()

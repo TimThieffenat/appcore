@@ -1,52 +1,52 @@
-"""Nom, version et réglages de l'application, lus par le socle (appcore/app.py)
-et par la compilation Android (appcore/android/app_config.py).
+"""The application's name, version and settings, read by the base (appcore/app.py)
+and by the Android build (appcore/android/app_config.py).
 
-Rien que des constantes (aucun import) : les scripts lisent ce fichier sans
-lancer l'app. Seul NAME est obligatoire ; une constante absente prend la valeur
-par défaut du socle (DEFAULTS de appcore/app.py), indiquée ici en commentaire.
+Nothing but constants (no import): the scripts read this file without
+running the app. Only NAME is required; a missing constant takes the base's
+default value (DEFAULTS in appcore/app.py), given here in a comment.
 """
 
-# Nom de l'app : affiché, et nom de l'APK. Un identifiant Java valide (lettres,
-# chiffres, _ ; pas d'espace). Le dossier de l'app sur ordinateur est
-# ~/.<nom en minuscules>, les réglages sont rangés sous ce nom.
+# The app's name: shown, and the APK's name. A valid Java identifier (letters,
+# digits, _; no spaces). The app's folder on desktop is
+# ~/.<name in lower case>, settings are stored under this name.
 NAME = "__APP_NAME__"
-VERSION = "0.1.0"        # le numéro affiché (le versionCode de Google Play est à part)
-# Destinataire des rapports d'erreur (bouton « Send by email » du rapport)
+VERSION = "0.1.0"        # the displayed number (Google Play's versionCode is separate)
+# Recipient of error reports (the report's "Send by email" button)
 SUPPORT_EMAIL = "__EMAIL__"
 
-# Langues proposées (l'anglais, langue du code, est toujours là). Les textes du
-# socle sont traduits dans ces 6 langues ; ceux de l'app, dans locales/<code>.py.
-LANGUAGES = ("en", "fr")                    # défaut : les 6 (en fr es it pt de)
-# Réglages de l'app recopiés dans le rapport d'erreur (en plus de langue, thème,
-# noms des notes et instrument), pour refaire un problème dans les mêmes conditions
+# Languages offered (English, the language of the code, is always there). The
+# base's texts are translated into these 6 languages; the app's, in locales/<code>.py.
+LANGUAGES = ("en", "fr")                    # default: all 6 (en fr es it pt de)
+# App settings copied into the error report (on top of language, theme,
+# note names and instrument), to reproduce a problem in the same conditions
 REPORT_SETTINGS = ()
 
-# Son (appcore/sound.py) : clé du réglage de l'instrument, instruments proposés
-# (« steel », « nylon » : guitares enregistrées ; « keys » : clavier synthétisé),
-# et notes préparées en arrière-plan au démarrage, les plus utilisées d'abord.
+# Sound (appcore/sound.py): key of the instrument setting, instruments offered
+# ("steel", "nylon": recorded guitars; "keys": synthesised keyboard),
+# and notes prepared in the background at start-up, most used first.
 SOUND_SETTING = "sound/instrument"
 VOICES = ("steel", "nylon", "keys")
 WARM_UP_NOTES = tuple(range(48, 77)) + tuple(range(36, 48)) + tuple(range(77, 89))
 
-# Anciens noms de l'app : au premier lancement sous le nouveau nom, ses réglages
-# et ses données sont repris (sur ordinateur).
+# Former names of the app: at the first start under the new name, its settings
+# and data are taken over (on desktop).
 OLD_NAMES = ()
 
 # --- Android ----------------------------------------------------------------------
-# Identifiant Google Play : définitif après la première publication.
-ANDROID_PACKAGE = "com.__app_slug__.app"    # défaut : com.<nom en minuscules>.app
-JAVA_PACKAGE = "org.__app_slug__"           # paquet de l'activité Java (écran allumé…)
-# Autorisations (sans le préfixe android.permission.). MODIFY_AUDIO_SETTINGS sert
-# au son (accordée sans rien demander) ; RECORD_AUDIO pour un micro (accordeur…).
+# Google Play identifier: final after the first release.
+ANDROID_PACKAGE = "com.__app_slug__.app"    # default: com.<name in lower case>.app
+JAVA_PACKAGE = "org.__app_slug__"           # package of the Java activity (screen kept on…)
+# Permissions (without the android.permission. prefix). MODIFY_AUDIO_SETTINGS is for
+# sound (granted without asking); RECORD_AUDIO for a microphone (tuner…).
 ANDROID_PERMISSIONS = ("MODIFY_AUDIO_SETTINGS",)
-# Clé d'envoi Google Play : alias dans le fichier, et nom du fichier dans ~
+# Google Play upload key: alias in the file, and file name in ~
 KEY_ALIAS = "__app_slug__"
 KEYSTORE_NAME = "__app_slug__-upload.jks"
-# Dossiers de l'app à copier dans l'APK en plus de locales/ et sounds/ (bibliothèques…)
+# App folders copied into the APK on top of locales/ and sounds/ (libraries…)
 EXTRA_DIRS = ()
-# Bibliothèques Java ajoutées par Gradle (Google Play Billing, WorkManager…),
-# pour le Java de l'app (android/java/<paquet>/, branché par AppHooks.java),
-# et les autorisations qu'elles ajoutent d'elles-mêmes à l'APK (attendues par la
-# vérification de fin de compilation), sans le préfixe android.permission.
-GRADLE_DEPENDENCIES = ()      # ex. ("com.android.billingclient:billing:8.3.0",)
-LIBRARY_PERMISSIONS = ()      # ex. ("com.android.vending.BILLING",)
+# Java libraries added by Gradle (Google Play Billing, WorkManager…),
+# for the app's Java (android/java/<package>/, plugged in by AppHooks.java),
+# and the permissions they add to the APK by themselves (expected by the
+# end-of-build check), without the android.permission. prefix.
+GRADLE_DEPENDENCIES = ()      # e.g. ("com.android.billingclient:billing:8.3.0",)
+LIBRARY_PERMISSIONS = ()      # e.g. ("com.android.vending.BILLING",)

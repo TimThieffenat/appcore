@@ -1,8 +1,8 @@
 @echo off
-rem Essai complet d'une app : tests, traductions, interface hors ecran.
-rem Double-clic depuis appcore\tools\ (ou lancer depuis n'importe ou) :
-rem l'app est le dossier au-dessus de appcore\. Resultats dans build\smoke\ de l'app.
-rem "smoke_test.bat nopause" : sans attendre une touche a la fin (scripts).
+rem Full check of an app: tests, translations, off-screen interface.
+rem Double-click from appcore\tools\ (or run from anywhere):
+rem the app is the folder above appcore\. Results in the app's build\smoke\.
+rem "smoke_test.bat nopause": without waiting for a key at the end (scripts).
 cd /d "%~dp0..\.."
 if not exist build\smoke mkdir build\smoke
 if exist build\smoke\smoke.log del build\smoke\smoke.log
@@ -16,6 +16,6 @@ where python >nul 2>nul || set PY=py
   %PY% appcore\tools\i18n_check.py
   %PY% appcore\tools\smoke_test.py
 ) > build\smoke\console.log 2>&1
-findstr /b /c:"OK" build\smoke\smoke.log >nul 2>nul && (echo Essai OK) || (echo ERREUR : voir build\smoke\console.log)
-echo Fini : voir build\smoke\console.log et les captures dans build\smoke\
+findstr /b /c:"OK" build\smoke\smoke.log >nul 2>nul && (echo Check OK) || (echo ERROR: see build\smoke\console.log)
+echo Done: see build\smoke\console.log and the screenshots in build\smoke\
 if not "%1"=="nopause" pause

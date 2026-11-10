@@ -1,43 +1,43 @@
-"""Correctif de python-for-android, appelé pendant la fabrication de l'APK / AAB.
+"""python-for-android fix, called while the APK / AAB is being made.
 
-buildozer le transmet à python-for-android (réglage p4a.hook, voir
-patch_deploy_tools.py). python-for-android appelle `after_apk_build` une fois
-le projet Android préparé (bibliothèques dans libs/, ressources dans
-src/main/res), juste avant la compilation par Gradle.
+buildozer passes it to python-for-android (p4a.hook setting, see
+patch_deploy_tools.py). python-for-android calls `after_apk_build` once
+the Android project is prepared (libraries in libs/, resources in
+src/main/res), right before Gradle builds it.
 
-Le problème : au démarrage, Qt charge les modules de PySide6 (QtCore.abi3.so,
-QtGui.abi3.so…) depuis le dossier des bibliothèques de l'app. Mais Android
-n'y installe que les fichiers dont le nom commence par « lib » quand l'app
-n'est pas en mode débogage, ce qui est le cas de la version Google Play. Qt ne
-les trouvait pas (« QtLoader: Can't find …/lib/arm64/QtCore.abi3.so ») et
-l'app se fermait juste après son logo. L'APK de test (mode débogage) n'était
-pas touché : Android y installe toutes les bibliothèques.
+The problem: at start-up, Qt loads the PySide6 modules (QtCore.abi3.so,
+QtGui.abi3.so…) from the app's library folder. But Android only
+installs files whose name starts with "lib" there when the app
+is not in debug mode, which is the case of the Google Play version. Qt did not
+find them ("QtLoader: Can't find …/lib/arm64/QtCore.abi3.so") and
+the app closed right after its logo. The test APK (debug mode) was
+not affected: Android installs all libraries there.
 
-Le correctif : ces modules prennent le préfixe « lib » (libQtCore.abi3.so…),
-dans le dossier libs/ et dans la liste que lit Qt (res/values/libs.xml).
-Python n'est pas concerné : il charge ses propres copies, dans le dossier de
-l'app (site-packages/PySide6).
+The fix: these modules take the "lib" prefix (libQtCore.abi3.so…),
+in the libs/ folder and in the list Qt reads (res/values/libs.xml).
+Python is not concerned: it loads its own copies, in the app's
+folder (site-packages/PySide6).
 
-Second correctif : chaque bibliothèque de la liste de Qt doit exister dans
-libs/<abi>/. Au démarrage, Qt les charge une à une et s'arrête à la première
-introuvable (« QtLoader: Can't find … ») : l'app se ferme aussitôt. Avec
-PySide6 6.12, l'outil de Qt ajoute à la liste les bibliothèques FFmpeg de Qt
-Multimedia sous le nom « libavcodec_arm64-v8a.so », alors qu'elles sont
-livrées sous le nom « libavcodec.so » : la 1re version 6.12 de l'app se
-fermait au démarrage. Une entrée introuvable prend le nom du fichier présent
-sans le suffixe d'architecture (libavcodec.so) ; s'il n'y en a pas non plus,
-elle est retirée de la liste (et notée dans le journal de compilation).
+Second fix: each library of Qt's list must exist in
+libs/<abi>/. At start-up, Qt loads them one by one and stops at the first one
+not found ("QtLoader: Can't find …"): the app closes at once. With
+PySide6 6.12, Qt's tool adds Qt Multimedia's FFmpeg libraries to the list
+under the name "libavcodec_arm64-v8a.so", while they are
+shipped as "libavcodec.so": the first 6.12 version of the app
+closed at start-up. An entry not found takes the name of the file present
+without the architecture suffix (libavcodec.so); if there is none either,
+it is removed from the list (and noted in the build log).
 
-Troisième correctif : l'ordre de chargement. Qt charge ses listes dans
-l'ordre, et chaque bibliothèque exécute son code d'initialisation (JNI_OnLoad)
-au chargement : libQt6Multimedia appelle alors Java à travers Qt Core, qui
-doit donc être chargée (et initialisée) AVANT elle. L'outil de Qt écrit les
-modules dans un ordre au hasard (il passe par un ensemble Python, dont l'ordre
-change d'une compilation à l'autre) : une compilation sur deux environ,
-Multimedia passait avant Core, et l'app se fermait sur un écran noir dès son
-lancement (SIGSEGV dans QJniEnvironment::getJniEnv). Chaque liste est donc
-remise dans l'ordre des dépendances (ELF DT_NEEDED) : une bibliothèque vient
-toujours après celles dont elle a besoin, sinon l'ordre d'origine est gardé.
+Third fix: the loading order. Qt loads its lists in
+order, and each library runs its initialisation code (JNI_OnLoad)
+when loaded: libQt6Multimedia then calls Java through Qt Core, which
+must therefore be loaded (and initialised) BEFORE it. Qt's tool writes the
+modules in a random order (it goes through a Python set, whose order
+changes from one build to the next): about one build in two,
+Multimedia came before Core, and the app closed on a black screen right at
+start-up (SIGSEGV in QJniEnvironment::getJniEnv). Each list is therefore
+put back in dependency order (ELF DT_NEEDED): a library always comes
+after those it needs, otherwise the original order is kept.
 """
 
 from __future__ import annotations
@@ -47,27 +47,27 @@ import re
 import struct
 from pathlib import Path
 
-# Nom d'un module PySide6 copié dans libs/<abi>/ sans le préfixe « lib »
+# Name of a PySide6 module copied into libs/<abi>/ without the "lib" prefix
 MODULE = re.compile(r"Qt\w+\.abi3\.so")
-# Le même nom dans la liste de Qt : <item>arm64-v8a;QtCore.abi3.so</item>
+# The same name in Qt's list: <item>arm64-v8a;QtCore.abi3.so</item>
 LIST_ITEM = re.compile(r"(<item>[\w-]+;)(Qt\w+\.abi3\.so)(</item>)")
 
 
-# Une entrée des listes de Qt : <item>arm64-v8a;libavutil_arm64-v8a.so</item>
-# (plusieurs bibliothèques possibles, séparées par « : »)
+# An entry of Qt's lists: <item>arm64-v8a;libavutil_arm64-v8a.so</item>
+# (several libraries possible, separated by ":")
 ANY_ITEM = re.compile(r"<item>([\w-]+);([^<]*)</item>")
 
 
 def library_file(name: str) -> str:
-    """Le fichier que Qt cherche pour un nom de la liste (QtLoader.java :
-    « Qt6Core_arm64-v8a » -> libQt6Core_arm64-v8a.so, un nom en .so tel quel)."""
+    """The file Qt looks for for a name of the list (QtLoader.java:
+    "Qt6Core_arm64-v8a" -> libQt6Core_arm64-v8a.so, a name ending in .so as is)."""
     return name if name.endswith(".so") else f"lib{name}.so"
 
 
 def fix_missing_libs(dist_dir: Path) -> list[str]:
-    """Chaque bibliothèque des listes de Qt (libs.xml) doit exister dans
-    libs/<abi>/ : sinon on prend le même nom sans suffixe d'architecture, ou on
-    la retire de la liste. Renvoie ce qui a changé."""
+    """Each library of Qt's lists (libs.xml) must exist in
+    libs/<abi>/: otherwise take the same name without the architecture suffix, or
+    remove it from the list. Returns what changed."""
     libs_xml = dist_dir / "src" / "main" / "res" / "values" / "libs.xml"
     libs = dist_dir / "libs"
     if not libs_xml.is_file() or not libs.is_dir():
@@ -89,7 +89,7 @@ def fix_missing_libs(dist_dir: Path) -> list[str]:
                 kept.append(plain)
                 changed.append(f"{abi}/{library_file(name)} -> {plain}")
             else:
-                changed.append(f"{abi}/{library_file(name)} : introuvable, retirée de la liste")
+                changed.append(f"{abi}/{library_file(name)}: not found, removed from the list")
         if not kept:
             return ""
         return f"<item>{abi};{':'.join(kept)}</item>"
@@ -102,7 +102,7 @@ def fix_missing_libs(dist_dir: Path) -> list[str]:
 
 
 def needed(path: Path) -> list[str]:
-    """Bibliothèques demandées par un fichier ELF 64 bits (DT_NEEDED)."""
+    """Libraries required by a 64-bit ELF file (DT_NEEDED)."""
     try:
         data = path.read_bytes()
     except OSError:
@@ -149,9 +149,9 @@ ARRAY = re.compile(r'(<array name="(\w+)">)(.*?)(</array>)', re.S)
 
 
 def order_libs(dist_dir: Path) -> list[str]:
-    """Remet chaque liste de libs.xml dans l'ordre des dépendances : chaque
-    bibliothèque après celles dont elle a besoin (dans cette liste ou dans les
-    listes précédentes, que Qt charge avant). Renvoie ce qui a changé."""
+    """Puts each list of libs.xml back in dependency order: each
+    library after those it needs (in this list or in the
+    previous lists, which Qt loads first). Returns what changed."""
     libs_xml = dist_dir / "src" / "main" / "res" / "values" / "libs.xml"
     libs = dist_dir / "libs"
     if not libs_xml.is_file() or not libs.is_dir():
@@ -174,8 +174,8 @@ def order_libs(dist_dir: Path) -> list[str]:
         todo = list(range(len(items)))
         while todo:
             listed = set().union(*(provides[i] for i in todo))
-            # le premier élément (dans l'ordre d'origine) dont les dépendances de
-            # la liste sont déjà chargées ; s'il n'y en a pas (cycle) : le premier
+            # the first item (in the original order) whose dependencies in
+            # the list are already loaded; if there is none (cycle): the first
             pick = next((i for i in todo if not (wants[i] & listed) - placed - provides[i]),
                         todo[0])
             todo.remove(pick)
@@ -199,8 +199,8 @@ def order_libs(dist_dir: Path) -> list[str]:
 
 
 def add_lib_prefix(dist_dir: Path) -> list[str]:
-    """Renomme les modules et met la liste de Qt à jour. Renvoie ce qui a changé.
-    Sans effet si c'est déjà fait (le dossier du projet est réutilisé)."""
+    """Renames the modules and updates Qt's list. Returns what changed.
+    No effect if already done (the project folder is reused)."""
     changed = []
     libs = dist_dir / "libs"
     if libs.is_dir():
@@ -220,17 +220,17 @@ def add_lib_prefix(dist_dir: Path) -> list[str]:
 
 
 def after_apk_build(toolchain) -> None:
-    """Appelé par python-for-android, dans le dossier du projet Android."""
+    """Called by python-for-android, in the Android project folder."""
     try:
         dist_dir = Path(toolchain._dist.dist_dir)
-    except Exception:  # noqa: BLE001 — sinon : le dossier courant (c'est le même)
+    except Exception:  # noqa: BLE001 — otherwise: the current folder (the same one)
         dist_dir = Path.cwd()
     changed = add_lib_prefix(dist_dir)
-    print("[APPCORE-PATCH] modules PySide6 préfixés « lib » :",
-          ", ".join(changed) if changed else "rien à faire", flush=True)
+    print("[APPCORE-PATCH] PySide6 modules prefixed with \"lib\":",
+          ", ".join(changed) if changed else "nothing to do", flush=True)
     fixed = fix_missing_libs(dist_dir)
-    print("[APPCORE-PATCH] liste des bibliothèques de Qt :",
-          ", ".join(fixed) if fixed else "toutes présentes", flush=True)
+    print("[APPCORE-PATCH] Qt's library list:",
+          ", ".join(fixed) if fixed else "all present", flush=True)
     ordered = order_libs(dist_dir)
-    print("[APPCORE-PATCH] ordre de chargement de Qt :",
-          " | ".join(ordered) if ordered else "déjà dans l'ordre des dépendances", flush=True)
+    print("[APPCORE-PATCH] Qt's loading order:",
+          " | ".join(ordered) if ordered else "already in dependency order", flush=True)

@@ -32,6 +32,14 @@ WARM_UP_NOTES = tuple(range(48, 77)) + tuple(range(36, 48)) + tuple(range(77, 89
 # and data are taken over (on desktop).
 OLD_NAMES = ()
 
+# Screen: "landscape" (phone in landscape, icon rail on the left) or
+# "portrait" (navigation bar at the bottom, the home page standing out).
+ORIENTATION = "landscape"                   # default: "landscape"
+# Home page: its index in main.py's pages() (0 = the first). The
+# window opens on it and Back returns to it; in portrait, in the middle of the
+# bottom bar with 5 pages, that is 2.
+HOME_PAGE = 0
+
 # --- Android ----------------------------------------------------------------------
 # Google Play identifier: final after the first release.
 ANDROID_PACKAGE = "com.__app_slug__.app"    # default: com.<name in lower case>.app

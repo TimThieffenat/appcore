@@ -5,7 +5,7 @@
     python3 appcore/android/app_config.py . --github-env >> "$GITHUB_ENV"
 
 writes "export APP_NAME=..." lines: name, version, Google Play package,
-Java package, permissions, signing key, extra folders. app_info.py
+Java package, permissions, signing key, extra folders, orientation. app_info.py
 is read without being imported (runpy): its constants must not import anything.
 Anything missing takes the base's default value (appcore/app.py).
 """
@@ -60,6 +60,8 @@ def config(root: Path) -> dict[str, str]:
         "APP_EXTRA_DIRS": " ".join(str(d) for d in info["EXTRA_DIRS"]),
         "APP_GRADLE_DEPS": ",".join(str(d) for d in info["GRADLE_DEPENDENCIES"]),
         "APP_LIBRARY_PERMISSIONS": ", ".join(_permission(p) for p in info["LIBRARY_PERMISSIONS"]),
+        "APP_ORIENTATION": ("portrait" if str(info["ORIENTATION"]).lower() == "portrait"
+                            else "landscape"),
     }
 
 

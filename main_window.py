@@ -1,14 +1,20 @@
-"""Main window: icon rail on the left, pages on the right.
+"""Main window: the pages, and their navigation buttons.
 
-Designed for a phone in landscape: the rail is narrow (icon + short word)
-and each page takes all the rest of the screen.
+- Phone in landscape (default): icon rail on the left, narrow (icon +
+  short word); each page takes all the rest of the screen.
+- Phone in portrait (ORIENTATION = "portrait" in app_info.py): navigation
+  bar at the bottom, under the thumb; the home page's button
+  (HOME_PAGE) stands out (in the middle of the bar, for example).
+  `set_nav_visible(False)` hides the bar (a full-screen game…).
+
+The window opens on the home page (HOME_PAGE, the first one by default).
 
 Pages come from the app (main.py): a list of (label, icon, class),
 the label marked N_() (translated here), the icon a name from appcore/icons.py
 or from the app's icons.py. A page can have:
 - app_paused() / app_resumed(): the app goes to the background / comes back;
 - handle_key(event) -> bool: keys (Android Back, Esc, digits…),
-  True if the page handled it. Otherwise Back returns to the first page.
+  True if the page handled it. Otherwise Back returns to the home page.
 """
 
 from __future__ import annotations
@@ -51,6 +57,7 @@ PAUSED_STATES = (Qt.ApplicationState.ApplicationSuspended,
                  Qt.ApplicationState.ApplicationHidden)
 
 RAIL_WIDTH = 84
+NAV_HEIGHT = 62                   # bottom bar (portrait)
 BUTTON_MIN, BUTTON_MAX = 32, 50   # height of a rail button (depends on the screen)
 # Fewer pages: bigger buttons (at most BIG_BUTTON_MAX, PerfectPitch)
 FEW_PAGES, BIG_BUTTON_MAX = 5, 64
@@ -60,17 +67,30 @@ class MainWindow(QMainWindow):
     def __init__(self, pages) -> None:
         super().__init__()
         self.pages = list(pages)
+        self.portrait = app.portrait()
+        self.home = min(app.home_page(), max(0, len(self.pages) - 1))
         self.setWindowTitle(app.name())
-        self.resize(1000, 480)
-        self.setMinimumSize(560, 300)
+        if self.portrait:
+            self.resize(420, 860)
+            self.setMinimumSize(320, 520)
+        else:
+            self.resize(1000, 480)
+            self.setMinimumSize(560, 300)
 
         rail = QFrame()
         self.rail = rail
-        rail.setObjectName("rail")
-        rail.setFixedWidth(RAIL_WIDTH)
-        rail_layout = QVBoxLayout(rail)
-        rail_layout.setContentsMargins(6, 4, 6, 4)
-        rail_layout.setSpacing(1)
+        if self.portrait:             # bottom bar
+            rail.setObjectName("navBar")
+            rail.setFixedHeight(NAV_HEIGHT)
+            rail_layout = QHBoxLayout(rail)
+            rail_layout.setContentsMargins(4, 4, 4, 6)
+            rail_layout.setSpacing(2)
+        else:                         # rail on the left
+            rail.setObjectName("rail")
+            rail.setFixedWidth(RAIL_WIDTH)
+            rail_layout = QVBoxLayout(rail)
+            rail_layout.setContentsMargins(6, 4, 6, 4)
+            rail_layout.setSpacing(1)
 
         self.stack = QStackedWidget()
         self.group = QButtonGroup(self)
@@ -84,34 +104,51 @@ class MainWindow(QMainWindow):
             button.setToolTip(tr(label))
             button.setCheckable(True)
             button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-            button.setIconSize(QSize(20, 20))
-            button.setFixedSize(RAIL_WIDTH - 12, 41)  # adjusted to the screen height
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
+            if self.portrait:
+                home = index == self.home
+                button.setObjectName("navHome" if home else "navButton")
+                button.setIconSize(QSize(28, 28) if home else QSize(22, 22))
+                button.setFixedHeight(NAV_HEIGHT - 10)
+                rail_layout.addWidget(button, 1)
+            else:
+                button.setIconSize(QSize(20, 20))
+                button.setFixedSize(RAIL_WIDTH - 12, 41)  # adjusted to the screen height
+                rail_layout.addWidget(button)
             self.group.addButton(button, index)
-            rail_layout.addWidget(button)
             self.buttons.append((button, icon))
             self.stack.addWidget(page_class())
-        rail_layout.addStretch(1)
+        if not self.portrait:
+            rail_layout.addStretch(1)
 
         self.group.idClicked.connect(self._show_page)
-        self.group.button(0).setChecked(True)
-        self.stack.setCurrentIndex(0)
+        self.group.button(self.home).setChecked(True)
+        self.stack.setCurrentIndex(self.home)
         self._refresh_icons()
         bus.settings_changed.connect(self._refresh_icons)
 
         central = QWidget()
-        layout = QHBoxLayout(central)
+        layout = QVBoxLayout(central) if self.portrait else QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(rail)
-        layout.addWidget(self.stack, 1)
+        if self.portrait:
+            layout.addWidget(self.stack, 1)
+            layout.addWidget(rail)
+        else:
+            layout.addWidget(rail)
+            layout.addWidget(self.stack, 1)
         self.setCentralWidget(central)
         self._app_paused = False
 
+    def set_nav_visible(self, visible: bool) -> None:
+        """Shows or hides the rail / the bottom bar (a full-screen game…)."""
+        self.rail.setVisible(visible)
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self._fit_rail()
+        if not self.portrait:
+            self._fit_rail()
 
     def _fit_rail(self) -> None:
         """The rail buttons share the screen height: every page stays
@@ -146,8 +183,9 @@ class MainWindow(QMainWindow):
         if hasattr(page, "handle_key") and page.handle_key(event):
             event.accept()
             return
-        if event.key() in (Qt.Key.Key_Back, Qt.Key.Key_Escape) and self.stack.currentIndex() != 0:
-            self.show_page(0)    # Back from another page: the first page
+        if (event.key() in (Qt.Key.Key_Back, Qt.Key.Key_Escape)
+                and self.stack.currentIndex() != self.home):
+            self.show_page(self.home)    # Back from another page: the home page
             event.accept()
             return
         super().keyPressEvent(event)

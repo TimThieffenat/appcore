@@ -1,4 +1,4 @@
-"""appcore: the shared base of the apps (PySide6, landscape phone + desktop).
+"""appcore: the shared base of the apps (PySide6, phone in landscape or portrait + desktop).
 
 Start-up, window with an icon rail, settings, themes, translations, error
 report, sound (recorded guitars, keyboard), touch controls, symbols font, and
@@ -9,4 +9,4 @@ in its `appcore/` folder and only writes what is its own
 This file imports nothing: `from appcore import app` works without Qt (tools, tests).
 """
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"

@@ -56,6 +56,12 @@ class AppConfigTests(unittest.TestCase):
         app._info = info
         self.assertEqual(app.slug(), "rifffinder2")
         self.assertEqual(app.languages(), ("en", "fr"))
+        self.assertFalse(app.portrait())                    # default: landscape
+        self.assertEqual(app.home_page(), 0)
+        info.ORIENTATION, info.HOME_PAGE = "portrait", 2
+        self.assertTrue(app.portrait())
+        self.assertEqual(app.home_page(), 2)
+        self.assertEqual(app.phone_size(), (390, 844))
 
     def test_android_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -68,6 +74,12 @@ class AppConfigTests(unittest.TestCase):
             self.assertEqual(values["JAVA_PACKAGE"], "org.myapp")
             self.assertEqual(values["APP_KEY_ALIAS"], "myapp")
             self.assertIn("android.permission.RECORD_AUDIO", values["APP_PERMISSIONS"])
+            self.assertEqual(values["APP_ORIENTATION"], "landscape")       # default
+            Path(tmp, "app_info.py").write_text('NAME = "MyApp"\nORIENTATION = "portrait"\n',
+                                                encoding="utf-8")
+            out = subprocess.run([sys.executable, str(CORE / "android" / "app_config.py"), tmp],
+                                 capture_output=True, text=True, check=True).stdout
+            self.assertIn("export APP_ORIENTATION=portrait", out.splitlines())
             Path(tmp, "app_info.py").write_text('NAME = "My App"\n', encoding="utf-8")
             bad = subprocess.run([sys.executable, str(CORE / "android" / "app_config.py"), tmp],
                                  capture_output=True, text=True)

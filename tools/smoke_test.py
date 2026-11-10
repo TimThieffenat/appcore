@@ -4,10 +4,11 @@ From the app's folder:
 
     python appcore/tools/smoke_test.py
 
-Opens the app's window off screen (phone format 850 × 390), in English,
-shows each page of the rail, the error report, then the first page in
-desktop format, in dark and in light; then, in each of the app's other
-languages, the first page and the settings. A screenshot of each screen
+Opens the app's window off screen (phone format: 850 × 390 in
+landscape, 390 × 844 in portrait, depending on ORIENTATION of app_info.py), in English,
+shows each page, the error report, then the home page in desktop
+format, in dark and in light; then, in each of the app's other languages,
+the home page and the settings. A screenshot of each screen
 is saved in build/smoke/. Sound is off ("visual" playback). The settings
 used are separate ("<App>-smoke"): the real ones are not touched.
 
@@ -108,12 +109,14 @@ def main() -> int:
         if extra is not None and hasattr(extra, name):
             getattr(extra, name)(*args)
 
+    phone = config.phone_size()
+    log(f"phone {'in portrait' if config.portrait() else 'in landscape'}: {phone[0]} × {phone[1]}")
     for theme in ("dark", "light"):
         log(f"=== theme {theme}")
         hook("before_theme", theme)
         apply_theme(app, theme)
         window = window_class(app_main.pages())
-        window.resize(850, 390)
+        window.resize(*phone)
         window.show()
         pump(10)
         for index, (label, _, _) in enumerate(window.pages):
@@ -122,7 +125,7 @@ def main() -> int:
             shot(window, f"{theme}_{index:02d}_{label.lower().replace(' ', '_')}")
         if extra is not None and hasattr(extra, "tour"):
             log("  the app's tour (tools/smoke_extra.py)")
-            window.show_page(0)
+            window.show_page(window.home)
             hook("tour", window, shot, pump, theme, log)
         # error report (Settings › Error report) and email address
         report = crash_report.full_report()
@@ -132,7 +135,7 @@ def main() -> int:
         view.deleteLater()
         url = crash_report.email_url(crash_report.full_report(compact=True), "test")
         log(f"  report: {len(report)} characters, email address: {len(url)} characters")
-        window.show_page(0)
+        window.show_page(window.home)
         window.resize(1280, 720)
         pump(5)
         shot(window, f"{theme}_95_desktop")
@@ -146,13 +149,14 @@ def main() -> int:
         i18n.set_language(code)
         hook("before_theme", "dark")
         window = window_class(app_main.pages())
-        window.resize(850, 390)
+        window.resize(*phone)
         window.show()
         pump(10)
-        shot(window, f"lang_{code}_1_{window.pages[0][0].lower().replace(' ', '_')}")
+        home = window.pages[window.home][0]
+        shot(window, f"lang_{code}_1_{home.lower().replace(' ', '_')}")
         window.show_page(settings_index(window.pages))
         shot(window, f"lang_{code}_2_settings")
-        window.show_page(0)
+        window.show_page(window.home)
         hook("tour_language", window, shot, pump, code, log)
         window.close()
         window.deleteLater()

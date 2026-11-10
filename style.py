@@ -33,6 +33,15 @@ QToolButton#navButton {{
 QToolButton#navButton:hover {{ background: {hover}; color: {text}; }}
 QToolButton#navButton:checked {{ background: {accent_soft}; color: {accent_text}; font-weight: 600; }}
 
+/* Bottom navigation bar (portrait): the home page stands out */
+QFrame#navBar {{ background: {surface}; border: none; border-top: 1px solid {border}; }}
+QToolButton#navHome {{
+    background: transparent; color: {accent_text}; border: 2px solid {accent};
+    border-radius: 14px; padding: 1px 2px; font-size: 11px; font-weight: 600;
+}}
+QToolButton#navHome:hover {{ background: {hover}; }}
+QToolButton#navHome:checked {{ background: {accent_soft}; }}
+
 /* Titles and texts */
 QLabel#title {{ font-size: 18px; font-weight: 600; }}
 QLabel#subtitle, QLabel#muted {{ color: {muted}; }}

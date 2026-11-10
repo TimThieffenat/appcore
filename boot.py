@@ -59,7 +59,7 @@ def _show_startup_error(app: QApplication, text: str) -> int:
         crash_report.full_report(), tr("{app} could not start", app=app_config.name()),
         on_close=app.quit)
     view.setWindowTitle(app_config.name())
-    view.resize(900, 420)
+    view.resize(*(app_config.phone_size() if app_config.portrait() else (900, 420)))
     if crash_report.on_android():
         view.showFullScreen()
     else:
@@ -79,7 +79,8 @@ class Windows:
         self.on_language = on_language
         self.window = None
 
-    def open(self, page: int = 0) -> None:
+    def open(self, page: int | None = None) -> None:
+        """Opens (or rebuilds) the window, on `page` (by default the home page)."""
         from appcore.app_signals import bus
         from appcore.main_window import MainWindow
         from appcore.ui_common import is_android
@@ -99,7 +100,7 @@ class Windows:
                     pass
         crash_report.step("building the pages")
         window = (self.window_class or MainWindow)(self.pages())
-        window.show_page(page)
+        window.show_page(window.home if page is None else page)
         # background / back (Android): stop sound, microphone and animations
         self.app.applicationStateChanged.connect(window.on_app_state_changed)
         crash_report.step("showing the window")

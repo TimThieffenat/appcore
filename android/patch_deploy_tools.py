@@ -78,15 +78,31 @@ def main() -> None:
           f'        self.set_value("app", "p4a.commit", "{P4A_COMMIT}")',
           "p4a-python311", required=False)   # 6.11 only
 
-    # 2) Landscape (both ways on a phone) and full screen.
+    # 2) Full screen, in landscape (both ways) or in portrait depending on
+    #    ORIENTATION of app_info.py (build_apk.sh puts it in APPCORE_ORIENTATION;
+    #    read at each build: the same patched tool serves every app).
+    #    A tool patched by a previous version (landscape hard-coded) is
+    #    updated first.
+    orientation = (f'        # {TAG}: orientation\n'
+                   '        import os as _os7\n'
+                   '        _portrait = _os7.environ.get("APPCORE_ORIENTATION", "") == "portrait"\n'
+                   '        self.set_value("app", "orientation",\n'
+                   '                       "portrait" if _portrait else "landscape")\n'
+                   '        self.set_value("app", "android.manifest.orientation",\n'
+                   '                       "portrait" if _portrait else "sensorLandscape")\n'
+                   '        self.set_value("app", "fullscreen", "1")')
+    landscape = (f'        # {TAG}: landscape\n'
+                 '        self.set_value("app", "orientation", "landscape")\n'
+                 '        self.set_value("app", "android.manifest.orientation", "sensorLandscape")\n'
+                 '        self.set_value("app", "fullscreen", "1")')
+    text = buildozer_cfg.read_text()
+    if landscape in text:
+        _write(buildozer_cfg, text.replace(landscape, orientation))
+        print("  + orientation (instead of the hard-coded landscape)")
     patch(buildozer_cfg,
           '        self.set_value("app", "p4a.bootstrap", "qt")',
-          '        self.set_value("app", "p4a.bootstrap", "qt")\n'
-          f'        # {TAG}: landscape\n'
-          '        self.set_value("app", "orientation", "landscape")\n'
-          '        self.set_value("app", "android.manifest.orientation", "sensorLandscape")\n'
-          '        self.set_value("app", "fullscreen", "1")',
-          "landscape")
+          '        self.set_value("app", "p4a.bootstrap", "qt")\n' + orientation,
+          "orientation")
 
     # 2b bis) Only the permissions the app uses. The tool copies
     #     those declared by every bundled Qt module, even unused ones:

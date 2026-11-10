@@ -1,8 +1,8 @@
 # appcore — the shared base of the apps
 
 The code shared by **RiffFinder**, **PerfectPitch** and the apps to come:
-Python + PySide6 (Qt), designed for a **phone in landscape** and usable on
-desktop, built for Android with Qt's tool.
+Python + PySide6 (Qt), designed for a **phone in landscape** (or in
+**portrait**, as each app chooses) and usable on desktop, built for Android with Qt's tool.
 
 Each app includes it as a **git submodule** in its `appcore/` folder and only
 writes what is its own. A fix here (error report, sound, Android build…)
@@ -13,7 +13,7 @@ serves every app.
 | Module | Role |
 |---|---|
 | `boot.py` | start-up: error report installed first, language, symbols font, theme, window, rebuilt when the language changes, data taken over from a former name |
-| `main_window.py` | the window: icon rail on the left (size adjusted to the screen), pages on the right, pause / resume in the background (Android), Back key |
+| `main_window.py` | the window: icon rail on the left (size adjusted to the screen) or, in portrait, navigation bar at the bottom with the home page standing out; pause / resume in the background (Android), Back key (to the home page) |
 | `page_settings.py` | the Settings page: language, theme, note names, instrument, error report; each app adds its own rows |
 | `app.py` | what the base knows about the app: the constants of its `app_info.py` (with their default values) |
 | `i18n.py`, `locales/` | translations: `tr()`, `ntr()` (plurals), `N_()`; 6 languages (en fr es it pt de) for the base's texts |
@@ -53,7 +53,10 @@ MyApp/
 
 - **`app_info.py`**: nothing but constants (the Android scripts read it without
   running the app). They are all described in `template/app_info.py`; only `NAME`
-  is required.
+  is required. `ORIENTATION = "portrait"` puts the app in portrait (navigation
+  bar at the bottom, APK in portrait); `HOME_PAGE` is the home page
+  (opened at start-up, standing out in the bottom bar, Back returns to it);
+  `window.set_nav_visible(False)` hides the rail or the bar (full-screen game).
 - **`main.py`**:
   ```python
   import sys
@@ -81,7 +84,7 @@ MyApp/
   any page, like PerfectPitch's Pro sheet).
 - **A page** is a `QWidget` (objectName `"page"`); it can have
   `app_paused()` / `app_resumed()` (background) and `handle_key(event)`
-  (keys; otherwise Back returns to the first page). It listens to
+  (keys; otherwise Back returns to the home page). It listens to
   `bus.settings_changed` to follow a setting.
 - **Settings**: a subclass of `appcore.page_settings.SettingsPage`, which
   overrides `rows()` (the order of the rows: `language_row()`, `theme_row()`,
@@ -144,7 +147,7 @@ page and the settings. Next: create the repository on GitHub,
 | Command | Role |
 |---|---|
 | `appcore\tools\smoke_test.bat` | everything at once (double-click): tests of the base and of the app, translations, interface check; results in `build\smoke\console.log` |
-| `python appcore/tools/smoke_test.py` | opens the app off screen (850 × 390), each page in dark and in light, the error report, the desktop format, then each other language; screenshots in `build/smoke/`; the app's own tour in `tools/smoke_extra.py` (optional) |
+| `python appcore/tools/smoke_test.py` | opens the app off screen (850 × 390 in landscape, 390 × 844 in portrait), each page in dark and in light, the error report, the desktop format, then each other language; screenshots in `build/smoke/`; the app's own tour in `tools/smoke_extra.py` (optional) |
 | `python appcore/tools/i18n_check.py` | the base's and the app's texts to translate, what is missing, what is no longer used (`--list`: all the app's texts, ready to paste; `--core`: the base alone) |
 | `python -m unittest discover -s appcore/tests -t .` | tests of the base |
 | `python appcore/tools/build_font.py` | rebuilds the app's symbols font (`--core`: the base's); needs fonttools and DejaVu Sans |

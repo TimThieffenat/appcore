@@ -33,6 +33,11 @@ DEFAULTS = {
     "WARM_UP_NOTES": tuple(range(40, 77)) + tuple(range(77, 89)) + (38, 39),
     # Former names of the app: settings and data taken over at first start
     "OLD_NAMES": (),
+    # Screen: "landscape" (phone in landscape, icon rail on the left) or
+    # "portrait" (navigation bar at the bottom); and the home page (its
+    # index in main.py's pages()): opened at start-up, Back returns to it
+    "ORIENTATION": "landscape",
+    "HOME_PAGE": 0,
     # Android
     "ANDROID_PACKAGE": "",          # default: com.<slug>.app
     "JAVA_PACKAGE": "",             # default: org.<slug>
@@ -80,6 +85,24 @@ def slug() -> str:
 
 def support_email() -> str:
     return str(get("SUPPORT_EMAIL") or "")
+
+
+def portrait() -> bool:
+    """The app is designed for a phone in portrait (navigation bar at the bottom)."""
+    return str(get("ORIENTATION")).lower() == "portrait"
+
+
+def home_page() -> int:
+    """The home page: opened at start-up, the one Back returns to."""
+    try:
+        return max(0, int(get("HOME_PAGE")))
+    except (TypeError, ValueError):
+        return 0
+
+
+def phone_size() -> tuple[int, int]:
+    """Size of a phone (in points), for the interface check and the window."""
+    return (390, 844) if portrait() else (850, 390)
 
 
 def languages() -> tuple[str, ...]:

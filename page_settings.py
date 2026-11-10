@@ -62,6 +62,8 @@ class SettingsPage(QWidget):
         form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         form.setHorizontalSpacing(16)
         form.setVerticalSpacing(10)
+        # narrow screen (phone in portrait): the label goes above
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         for text, widget in self.rows():
             label = QLabel(text)
             label.setObjectName("muted")
@@ -81,9 +83,12 @@ class SettingsPage(QWidget):
         card_layout.addWidget(title)
         card_layout.addLayout(form)
         row = QHBoxLayout()
-        row.addStretch(1)
-        row.addWidget(card, 4)
-        row.addStretch(1)
+        if app.portrait():          # narrow screen: the full width
+            row.addWidget(card, 1)
+        else:
+            row.addStretch(1)
+            row.addWidget(card, 4)
+            row.addStretch(1)
 
         content = QWidget()
         inner = QVBoxLayout(content)

@@ -21,7 +21,7 @@ from operator import add, mul
 
 from PySide6.QtCore import QElapsedTimer, QIODevice, QObject, Qt, QTimer
 
-from appcore.guitar_synth import audioop, fade_out
+from appcore.guitar_synth import FAST, audioop, fade_out, mix
 
 try:
     from PySide6.QtMultimedia import QAudioFormat, QAudioSink, QMediaDevices
@@ -31,10 +31,23 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+<<<<<<< Updated upstream
 BUFFER_SECONDS = 0.08
 CUT_SECONDS = 0.012     # même corde rejouée : la note d'avant s'éteint aussitôt
 FADE_SECONDS = 0.12     # suite remplacée ou arrêtée : fondu rapide
 IDLE_STOP_MS = 1500     # plus rien à jouer depuis 1,5 s : la sortie audio s'arrête
+=======
+# Sound asked for in advance by the audio output: a touched note is heard that
+# much later, so as little as possible (the metronome runs with the same 50 ms).
+# If the sound crackles on a slow device, this is the value to raise.
+BUFFER_SECONDS = 0.05
+CUT_SECONDS = 0.012     # same string played again: the previous note stops at once
+FADE_SECONDS = 0.12     # sequence replaced or stopped: quick fade
+# Nothing left to play for 20 s: the audio output stops. Starting it again takes
+# a moment (up to a tenth of a second on a phone), heard as a late first note:
+# between two notes touched on the neck, the output stays open and plays silence.
+IDLE_STOP_MS = 20000
+>>>>>>> Stashed changes
 IDLE_TICK_MS = 250
 
 
@@ -50,11 +63,25 @@ class _Voice:
     def end(self) -> int:
         return self.start + len(self.pcm) // 2
 
+<<<<<<< Updated upstream
     def cut(self, at: int, fade: int) -> None:
         """S'éteint à partir de l'image `at`, en `fade` images."""
+=======
+    def cut(self, at: int, fade: int) -> "_Voice | None":
+        """Dies out from frame `at`, over `fade` frames. The sound is not copied
+        (a song weighs tens of megabytes, and the audio output waits meanwhile):
+        the voice just stops at `at`, and its short fading end is returned as a
+        voice of its own, to play with the others (None: nothing to cut)."""
+>>>>>>> Stashed changes
         keep = at - self.start + fade
-        if keep * 2 < len(self.pcm):
-            self.pcm = fade_out(self.pcm[:max(0, keep) * 2], fade)
+        if keep * 2 >= len(self.pcm):
+            return None
+        keep = max(0, keep)
+        head = max(0, keep - fade)
+        view = memoryview(self.pcm)
+        end = fade_out(bytes(view[2 * head:2 * keep]), fade)
+        self.pcm = view[:2 * head]
+        return _Voice(end, self.start + head, self.strings, self.one_shot) if end else None
 
 
 def _sum(frames: int, segments: list[tuple[int, bytes]]) -> bytes:
@@ -69,9 +96,17 @@ def _sum(frames: int, segments: list[tuple[int, bytes]]) -> bytes:
             a, b = 2 * offset, 2 * offset + len(pcm)
             acc[a:b] = audioop.add(bytes(acc[a:b]), pcm, 2)
         return bytes(acc)
+<<<<<<< Updated upstream
     # Sans audioop (Python 3.13 et plus, donc l'app Android en Python 3.14) :
     # additions par tranches avec map(), sans boucle Python par échantillon
     # (ce code tourne pendant la lecture, à chaque bloc demandé par la sortie).
+=======
+    # Without audioop (Python 3.13 and later, so the Android app on Python 3.14):
+    # this code runs during playback, for each block the output asks for.
+    if FAST:   # big integers as vectors: no work per sample (see guitar_synth)
+        return mix(frames, segments)
+    # else additions by slices with map(), without a Python loop per sample
+>>>>>>> Stashed changes
     total = array("i", bytes(4 * frames))
     for offset, pcm in segments:
         src = array("h")
@@ -109,19 +144,29 @@ class _Mix(QIODevice):
             for voice in self.voices:
                 if voice.end <= now:
                     continue
+<<<<<<< Updated upstream
                 if not voice.one_shot:        # une suite s'arrête
                     voice.cut(now, int(FADE_SECONDS * sample_rate))
                 elif voice.strings & strings:  # corde rejouée
                     voice.cut(now, int(CUT_SECONDS * sample_rate))
+=======
+                end = None
+                if not voice.one_shot:        # a sequence stops
+                    end = voice.cut(now, int(FADE_SECONDS * sample_rate))
+                elif voice.strings & strings:  # string played again
+                    end = voice.cut(now, int(CUT_SECONDS * sample_rate))
+>>>>>>> Stashed changes
                 voices.append(voice)
+                if end is not None:
+                    voices.append(end)
             voices.append(_Voice(pcm, now, strings, one_shot))
             self.voices = voices
             return now
 
     def fade_all(self, fade: int) -> None:
         with self.lock:
-            for voice in self.voices:
-                voice.cut(self.frames, fade)
+            ends = [voice.cut(self.frames, fade) for voice in self.voices]
+            self.voices += [end for end in ends if end is not None]
 
     def silent(self) -> bool:
         with self.lock:
@@ -140,6 +185,8 @@ class _Mix(QIODevice):
                 a, b = max(t0, voice.start), min(t1, voice.end)
                 if a < b:
                     segments.append((a - t0, voice.pcm[2 * (a - voice.start):2 * (b - voice.start)]))
+        if not segments:   # silence (the output stays open between two notes): nothing to compute
+            return bytes(frames * self.frame_bytes)
         return self.convert(_sum(frames, segments))
 
     def writeData(self, data) -> int:

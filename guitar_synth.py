@@ -15,7 +15,8 @@ Without Qt and without external dependencies:
 - each pitch is prepared once, kept in memory and, if a cache folder
   is given, on disk (instant afterwards);
 - mixing uses the standard "audioop" module when it exists
-  (Python ≤ 3.12), otherwise pure Python written without per-sample loops.
+  (Python ≤ 3.12), otherwise big integers used as vectors of samples
+  (see "PCM arithmetic without audioop"): no work per sample in Python.
 
 Output format: signed 16-bit PCM, mono, at the chosen sample rate
 (the audio output's).
@@ -33,7 +34,7 @@ import warnings
 import zlib
 from array import array
 from itertools import repeat
-from operator import add, mul, sub
+from operator import add, mul, sub, truediv
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -57,6 +58,10 @@ VOICES = {
 }
 DEFAULT_VOICE = "steel"
 KEYS_RATE = 22050      # the keyboard is computed at this rate, then converted
+# Notes at a given volume are kept ready (a touched note then sounds at once); a
+# note is about 250 KB: beyond this size, they are dropped and prepared again
+# when needed.
+VARIANTS_BYTES = 64 * 1024 * 1024
 
 
 def voice_dir(voice: str) -> Path | None:
@@ -235,6 +240,113 @@ def keys_tone(freq: float, sample_rate: int = KEYS_RATE, seconds: float = 2.2) -
     return _to_int16(out)
 
 
+# --- PCM arithmetic without audioop: big integers as vectors -------------------------------
+#
+# Without audioop (Python 3.13 and later, so the Android app), anything done sample
+# by sample costs about 50 ns per sample, even hidden in map(): on a fast computer,
+# mixing a four-minute song took 8 s (and froze the screen for half a second at
+# a time), one touched note 20 ms; a phone is several times slower. Python's big
+# integers do the same sums at the speed of a memory copy: a sound becomes ONE integer whose
+# 32-bit "digits" are its samples, and adding two such integers adds all their
+# samples at once. A sound is split in two integers (its samples of even rank and
+# of odd rank): 16-bit samples then sit in 32-bit digits, with room for the sum of
+# thousands of sounds. Samples are stored + 32768 (0..65535) so that no digit is
+# negative: digits never borrow from their neighbours, and a slice of the integer
+# is a slice of the sound.
+
+FAST = audioop is None and sys.byteorder == "little"   # this arithmetic is in use
+_ONES = (1, 1)   # (count, the integer made of `count` digits worth 1)
+
+
+def _ones(count: int) -> int:
+    """`count` 32-bit digits all worth 1: `k * _ones(n)` writes k in n digits."""
+    global _ONES
+    have, value = _ONES
+    while have < count:
+        value |= value << (32 * have)
+        have *= 2
+        _ONES = (have, value)   # one assignment: safe from several threads
+    return value >> (32 * (have - count)) if count > 0 else 0
+
+
+def _digits(pcm, count: int) -> tuple[int, int]:
+    """16-bit PCM of `count` samples -> (samples of even rank, of odd rank), each
+    an integer of 32-bit digits worth sample + 32768."""
+    raw = int.from_bytes(pcm, "little")
+    n_even, n_odd = (count + 1) // 2, count // 2
+    even = (raw & (0xFFFF * _ones(n_even))) ^ (0x8000 * _ones(n_even))
+    odd = ((raw >> 16) & (0xFFFF * _ones(n_odd))) ^ (0x8000 * _ones(n_odd))
+    return even, odd
+
+
+def _pcm(even: int, odd: int, count: int) -> bytes:
+    """The reverse of _digits: digits worth sample + 32768 -> 16-bit PCM."""
+    n_even, n_odd = (count + 1) // 2, count // 2
+    raw = (even ^ (0x8000 * _ones(n_even))) | ((odd ^ (0x8000 * _ones(n_odd))) << 16)
+    return raw.to_bytes(2 * count, "little")
+
+
+def _clamp(total: int, count: int) -> int:
+    """Digits worth sum + 2**31 + 32768 -> digits worth sample + 32768, the sum
+    brought back between -32768 and 32767 (all the digits at once)."""
+    ones = _ones(count)
+    if total & (0xFFFF0000 * ones) == 0x80000000 * ones:   # nothing goes over: the usual case
+        return total & (0xFFFF * ones)
+    under = ((total >> 31) & ones) ^ ones                  # 1 where the sum < -32768
+    high = (total >> 16) & (0x7FFF * ones)
+    over = (((high + 0x7FFF * ones) >> 15) & ones) & (under ^ ones)   # 1 where the sum > 32767
+    return ((total & (0xFFFF * ones)) | (over * 0xFFFF)) & ~(under * 0xFFFF)
+
+
+def _finish(even: int, odd: int, count: int) -> bytes:
+    """Sums (integers of signed digits, even and odd ranks) -> clipped 16-bit PCM."""
+    n_even, n_odd = (count + 1) // 2, count // 2
+    return _pcm(_clamp(even + 0x80008000 * _ones(n_even), n_even),
+                _clamp(odd + 0x80008000 * _ones(n_odd), n_odd), count)
+
+
+def _signed(pcm, count: int) -> tuple[int, int]:
+    """Like _digits, with digits worth the sample itself (signed): ready to be
+    added to a sum. Such an integer can no longer be sliced."""
+    even, odd = _digits(pcm, count)
+    return (even - 0x8000 * _ones((count + 1) // 2), odd - 0x8000 * _ones(count // 2))
+
+
+def mix(frames: int, segments) -> bytes:
+    """Sum of 16-bit mono PCM pieces [(offset in frames, pcm)] placed in `frames`
+    frames, clipped: what audioop would do, when it is missing (see FAST). The
+    pieces must fit in the frames; made for short blocks (the audio output's)."""
+    even = odd = 0
+    for offset, pcm in segments:
+        e, o = _signed(pcm, len(pcm) // 2)
+        if offset % 2 == 0:
+            even += e << (16 * offset)
+            odd += o << (16 * offset)
+        else:   # shifted by one sample: the ranks swap
+            odd += e << (16 * (offset - 1))
+            even += o << (16 * (offset + 1))
+    return _finish(even, odd, frames)
+
+
+_CHUNK = 1 << 18   # samples handled at once: a whole note, yet integers of 1 MB at most
+
+
+def _scale_fast(pcm: bytes, gain: float) -> bytes:
+    """pcm * gain for 0 <= gain <= 1, to the nearest 1/32768 (rounded down)."""
+    g = int(round(gain * 32768))
+    out = []
+    for start in range(0, len(pcm) // 2, _CHUNK):
+        chunk = pcm[2 * start:2 * (start + _CHUNK)]
+        count = len(chunk) // 2
+        scaled = []
+        for digits, n in zip(_digits(chunk, count), ((count + 1) // 2, count // 2)):
+            ones = _ones(n)
+            # digit = sample + 32768, so (digit * g) >> 15 = (sample * g >> 15) + g
+            scaled.append(((digits * g >> 15) & (0xFFFF * ones)) + (32768 - g) * ones)
+        out.append(_pcm(scaled[0], scaled[1], count))
+    return b"".join(out)
+
+
 # --- PCM operations (audioop if available) ----------------------------------------------
 
 def scale(pcm: bytes, gain: float) -> bytes:
@@ -242,6 +354,8 @@ def scale(pcm: bytes, gain: float) -> bytes:
         return pcm
     if audioop:
         return audioop.mul(pcm, 2, gain)
+    if FAST and 0.0 <= gain <= 1.0:
+        return _scale_fast(pcm[:len(pcm) // 2 * 2], gain)
     data = array("h")
     data.frombytes(pcm)
     values = array("i", map(int, map(mul, data, repeat(gain))))   # without a Python loop
@@ -250,16 +364,20 @@ def scale(pcm: bytes, gain: float) -> bytes:
     return array("h", values).tobytes()
 
 
+def _ramp(samples: array, weights) -> bytes:
+    """Each sample * its weight / len(samples), without a Python loop."""
+    scaled = map(truediv, map(mul, samples, weights), repeat(len(samples)))
+    return array("h", map(int, scaled)).tobytes()
+
+
 def fade_out(pcm: bytes, samples: int) -> bytes:
-    """Fade out over the last `samples` samples (small: pure Python)."""
+    """Fade out over the last `samples` samples."""
     samples = min(samples, len(pcm) // 2)
     if samples <= 0:
         return pcm
     tail = array("h")
     tail.frombytes(pcm[len(pcm) - 2 * samples:])
-    for i in range(samples):
-        tail[i] = int(tail[i] * (samples - i) / samples)
-    return pcm[:len(pcm) - 2 * samples] + tail.tobytes()
+    return pcm[:len(pcm) - 2 * samples] + _ramp(tail, range(samples, 0, -1))
 
 
 def fade_in(pcm: bytes, samples: int) -> bytes:
@@ -268,9 +386,7 @@ def fade_in(pcm: bytes, samples: int) -> bytes:
         return pcm
     head = array("h")
     head.frombytes(pcm[:2 * samples])
-    for i in range(samples):
-        head[i] = int(head[i] * i / samples)
-    return head.tobytes() + pcm[2 * samples:]
+    return _ramp(head, range(samples)) + pcm[2 * samples:]
 
 
 @dataclass
@@ -305,32 +421,82 @@ def arpeggio(synth: "GuitarSynth", midis, step: float = 0.18, seconds: float = 1
 class Mixer:
     """Sum of sounds placed in time, each with its volume.
 
-    Without audioop (Python 3.13 and later, so the Android app on Python 3.14),
-    the sum is done in floating point, volume included, in one pass per sound and
-    without a Python loop per sample; clipping only happens at the end."""
+    `seconds`: the length of the whole. None when it is not known in advance:
+    the mix then grows with the sounds added (each one can be mixed as soon as
+    it is ready, without keeping them all), and to_bytes(seconds) gives it its
+    final length.
 
-    def __init__(self, sample_rate: int, seconds: float) -> None:
+    Without audioop (Python 3.13 and later, so the Android app on Python 3.14),
+    the sum is kept in big integers (see "PCM arithmetic without audioop"), by
+    blocks of BLOCK samples: adding a sound only touches the blocks it covers,
+    whatever the length of the whole. Clipping only happens at the end."""
+
+    BLOCK = 16384   # samples per block (even)
+
+    def __init__(self, sample_rate: int, seconds: float | None = None) -> None:
         self.sample_rate = sample_rate
-        self.length = max(1, int(seconds * sample_rate))
+        self.open = seconds is None   # no fixed length: grows with the sounds
+        self.length = 0 if seconds is None else max(1, int(seconds * sample_rate))
         if audioop:
-            self.buffer = bytearray(2 * self.length)
+            self.buffer = bytearray()
+        elif FAST:
+            self._even: list[int] = []   # per block: sum of the samples of even rank
+            self._odd: list[int] = []    # and of odd rank (integers of signed digits)
+            self._mixed: bytes | None = None   # the result, once asked for
+            self._offset = 0x8000 * _ones(self.BLOCK // 2)   # the + 32768 of a whole block
         else:
-            self.acc = array("d", bytes(8 * self.length))
+            self.acc = array("d")
+        self._room(self.length)
+
+    def _room(self, length: int) -> None:
+        """Makes room for `length` samples."""
+        if audioop:
+            self.buffer.extend(bytes(max(0, 2 * length - len(self.buffer))))
+        elif FAST:
+            missing = -(-length // self.BLOCK) - len(self._even)
+            if missing > 0:
+                self._even += [0] * missing
+                self._odd += [0] * missing
+        else:
+            self.acc.extend(array("d", bytes(max(0, 8 * (length - len(self.acc))))))
 
     def add(self, pcm: bytes, at_seconds: float, gain: float = 1.0) -> None:
         start = int(round(at_seconds * self.sample_rate))
-        if start >= self.length or not pcm:
+        if not pcm or (start >= self.length and not self.open):
             return
         if start < 0:
             pcm = pcm[-2 * start:]
             start = 0
-        count = min(len(pcm) // 2, self.length - start)
+        count = len(pcm) // 2
+        if not self.open:
+            count = min(count, self.length - start)
+        elif start + count > self.length:
+            self.length = start + count
+            self._room(self.length)
         if count <= 0:
             return
         if audioop:
             a, b = 2 * start, 2 * (start + count)
             chunk = pcm[:2 * count] if gain == 1.0 else audioop.mul(pcm[:2 * count], 2, gain)
             self.buffer[a:b] = audioop.add(bytes(self.buffer[a:b]), chunk, 2)
+        elif FAST:
+            if self._mixed is not None:   # a sound added after to_bytes(): the sum
+                mixed, self._mixed = self._mixed, None   # starts again from its result
+                self.add(mixed, 0.0)
+            sound = pcm if len(pcm) == 2 * count else pcm[:2 * count]
+            if gain != 1.0:
+                sound = scale(sound, gain)
+            for done in range(0, count, _CHUNK):   # one pass for a note
+                chunk = sound if count <= _CHUNK else sound[2 * done:2 * (done + _CHUNK)]
+                size = len(chunk) // 2
+                even, odd = _digits(chunk, size)
+                first = (start + done) // 2
+                if (start + done) % 2 == 0:
+                    self._put(self._even, first, even, (size + 1) // 2)
+                    self._put(self._odd, first, odd, size // 2)
+                else:   # shifted by one sample: the ranks swap
+                    self._put(self._odd, first, even, (size + 1) // 2)
+                    self._put(self._even, first + 1, odd, size // 2)
         else:
             src = array("h")
             src.frombytes(pcm[:2 * count])
@@ -338,13 +504,45 @@ class Mixer:
             scaled = src if gain == 1.0 else map(mul, src, repeat(gain))
             self.acc[start:end] = array("d", map(add, self.acc[start:end], scaled))
 
-    def to_bytes(self) -> bytes:
+    def _put(self, blocks: list[int], first: int, digits: int, count: int) -> None:
+        """Adds `count` digits (worth sample + 32768) from digit `first` on, in
+        the blocks they cover."""
+        half = self.BLOCK // 2
+        block, pos = divmod(first, half)
+        while count > 0:
+            take = min(half - pos, count)
+            piece = digits
+            if take < count:
+                piece &= (1 << (32 * take)) - 1
+                digits >>= 32 * take
+            offset = self._offset if take == half else 0x8000 * _ones(take)
+            blocks[block] += (piece - offset) << (32 * pos)
+            count -= take
+            block += 1
+            pos = 0
+
+    def to_bytes(self, seconds: float | None = None) -> bytes:
+        """The mix; `seconds`: its length (else the one given at the start, or
+        the end of the last sound)."""
+        length = self.length if seconds is None else max(1, int(seconds * self.sample_rate))
         if audioop:
-            return bytes(self.buffer)
-        values = array("i", map(int, self.acc))
-        if values and (min(values) < -32768 or max(values) > 32767):
-            values = array("i", (max(-32768, min(32767, x)) for x in values))
-        return array("h", values).tobytes()
+            mixed = bytes(self.buffer[:2 * length])
+        elif FAST:
+            if self._mixed is None:
+                out = []
+                for block in range(min(len(self._even), -(-length // self.BLOCK))):
+                    out.append(_finish(self._even[block], self._odd[block], self.BLOCK))
+                    self._even[block] = self._odd[block] = 0   # frees the memory as it goes
+                if len(out) * self.BLOCK > length:   # the last block, cut to the length
+                    out[-1] = out[-1][:2 * (length - (len(out) - 1) * self.BLOCK)]
+                self._mixed = b"".join(out)
+            mixed = self._mixed[:2 * length]
+        else:
+            values = array("i", map(int, self.acc[:length]))
+            if values and (min(values) < -32768 or max(values) > 32767):
+                values = array("i", (max(-32768, min(32767, x)) for x in values))
+            mixed = array("h", values).tobytes()
+        return mixed + bytes(2 * length - len(mixed))   # silence up to the length asked for
 
 
 # --- The synthesiser ---------------------------------------------------------------------
@@ -360,6 +558,7 @@ class GuitarSynth:
                           if cache_dir else None)
         self._notes: dict[int, bytes] = {}
         self._variants: dict[tuple, bytes] = {}
+        self._variants_bytes = 0
         self._lock = threading.Lock()
         self._chuck: bytes | None = None
 
@@ -439,8 +638,11 @@ class GuitarSynth:
         if pcm is None:
             pcm = make()
             with self._lock:
-                if len(self._variants) > 600:
+                if len(self._variants) > 600 or self._variants_bytes > VARIANTS_BYTES:
                     self._variants.clear()
+                    self._variants_bytes = 0
+                if key not in self._variants:
+                    self._variants_bytes += len(pcm)
                 self._variants[key] = pcm
         return pcm
 

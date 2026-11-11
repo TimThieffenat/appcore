@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import random
 import runpy
 import subprocess
 import sys
 import tempfile
 import types
 import unittest
+from array import array
 from pathlib import Path
 
 CORE = Path(__file__).resolve().parent.parent
@@ -147,6 +149,72 @@ class SoundTests(unittest.TestCase):
     def test_music_theory(self) -> None:
         self.assertEqual(mt.note_pc("A"), 9)
         self.assertIn("Major", mt.CHORDS)
+
+
+@unittest.skipUnless(sys.byteorder == "little", "arithmetic written for little-endian PCM")
+class PcmWithoutAudioopTests(unittest.TestCase):
+    """The arithmetic used when audioop is missing (the Android app): forced
+    here, so that it is also tested on a computer, and compared with sums done
+    sample by sample."""
+
+    def setUp(self) -> None:
+        self._saved = guitar_synth.audioop, guitar_synth.FAST, guitar_synth.Mixer.BLOCK
+        guitar_synth.audioop, guitar_synth.FAST = None, True
+        self.rnd = random.Random(5)
+
+    def tearDown(self) -> None:
+        guitar_synth.audioop, guitar_synth.FAST, guitar_synth.Mixer.BLOCK = self._saved
+
+    def _noise(self, count: int, peak: int = 32767) -> bytes:
+        edge = (-32768, 32767, 0)   # the extreme values, often
+        return array("h", (self.rnd.choice(edge) if self.rnd.random() < 0.05
+                           else self.rnd.randint(-peak, peak) for _ in range(count))).tobytes()
+
+    @staticmethod
+    def _reference(frames: int, pieces) -> bytes:
+        total = [0] * frames
+        for offset, pcm in pieces:
+            for i, sample in enumerate(array("h", bytes(pcm))):
+                total[offset + i] += sample
+        return array("h", (max(-32768, min(32767, x)) for x in total)).tobytes()
+
+    def test_mix(self) -> None:
+        for frames in (1, 2, 7, 64, 501):
+            for _ in range(20):
+                pieces = []
+                for _ in range(self.rnd.randint(0, 8)):   # loud pieces: the sum clips
+                    offset = self.rnd.randrange(frames)
+                    pieces.append((offset, self._noise(self.rnd.randint(1, frames - offset))))
+                self.assertEqual(guitar_synth.mix(frames, pieces), self._reference(frames, pieces))
+
+    def test_mixer(self) -> None:
+        rate = 1000
+        for block in (4, 16, 16384):       # small blocks: every sound crosses several
+            guitar_synth.Mixer.BLOCK = block
+            for seconds in (None, 0.01, 0.3, 1.0):   # None: grows with the sounds
+                mixer = guitar_synth.Mixer(rate, seconds)
+                pieces = []
+                for _ in range(8):
+                    pcm, at = self._noise(self.rnd.randint(1, 400)), self.rnd.uniform(-0.1, 1.1)
+                    mixer.add(pcm, at)
+                    start = int(round(at * rate))
+                    if start < 0:
+                        pcm, start = pcm[-2 * start:], 0
+                    if seconds is not None:
+                        pcm = pcm[:2 * max(0, mixer.length - start)]
+                    if pcm:
+                        pieces.append((start, pcm))
+                self.assertEqual(mixer.to_bytes(), self._reference(mixer.length, pieces))
+                self.assertEqual(mixer.to_bytes(), mixer.to_bytes())            # asked twice
+                longer = mixer.to_bytes(mixer.length / rate + 0.05)             # padded with silence
+                self.assertEqual(longer, mixer.to_bytes() + bytes(len(longer) - 2 * mixer.length))
+
+    def test_scale(self) -> None:
+        for gain in (0.0, 0.13, 0.27, 0.6, 1.0):
+            pcm = self._noise(70001)       # more than one chunk, an odd count
+            scaled = array("h", guitar_synth._scale_fast(pcm, gain))
+            for before, after in zip(array("h", pcm), scaled):
+                self.assertLessEqual(abs(after - before * gain), 1.5)
 
 
 class TemplateTests(unittest.TestCase):

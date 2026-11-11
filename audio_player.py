@@ -41,10 +41,6 @@ FADE_SECONDS = 0.12     # sequence replaced or stopped: quick fade
 # a moment (up to a tenth of a second on a phone), heard as a late first note:
 # between two notes touched on the neck, the output stays open and plays silence.
 IDLE_STOP_MS = 20000
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 IDLE_TICK_MS = 250
 
 
@@ -65,10 +61,6 @@ class _Voice:
         (a song weighs tens of megabytes, and the audio output waits meanwhile):
         the voice just stops at `at`, and its short fading end is returned as a
         voice of its own, to play with the others (None: nothing to cut)."""
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
         keep = at - self.start + fade
         if keep * 2 >= len(self.pcm):
             return None
@@ -97,10 +89,6 @@ def _sum(frames: int, segments: list[tuple[int, bytes]]) -> bytes:
     if FAST:   # big integers as vectors: no work per sample (see guitar_synth)
         return mix(frames, segments)
     # else additions by slices with map(), without a Python loop per sample
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
     total = array("i", bytes(4 * frames))
     for offset, pcm in segments:
         src = array("h")
@@ -143,10 +131,6 @@ class _Mix(QIODevice):
                     end = voice.cut(now, int(FADE_SECONDS * sample_rate))
                 elif voice.strings & strings:  # string played again
                     end = voice.cut(now, int(CUT_SECONDS * sample_rate))
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
                 voices.append(voice)
                 if end is not None:
                     voices.append(end)

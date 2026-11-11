@@ -17,10 +17,6 @@ Without Qt and without external dependencies:
 - mixing uses the standard "audioop" module when it exists
   (Python ≤ 3.12), otherwise big integers used as vectors of samples
   (see "PCM arithmetic without audioop"): no work per sample in Python.
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 
 Output format: signed 16-bit PCM, mono, at the chosen sample rate
 (the audio output's).
@@ -66,10 +62,6 @@ KEYS_RATE = 22050      # the keyboard is computed at this rate, then converted
 # note is about 250 KB: beyond this size, they are dropped and prepared again
 # when needed.
 VARIANTS_BYTES = 64 * 1024 * 1024
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 
 
 def voice_dir(voice: str) -> Path | None:
@@ -356,10 +348,6 @@ def _scale_fast(pcm: bytes, gain: float) -> bytes:
 
 
 # --- PCM operations (audioop if available) ----------------------------------------------
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 
 def scale(pcm: bytes, gain: float) -> bytes:
     if gain == 1.0:
@@ -383,9 +371,7 @@ def _ramp(samples: array, weights) -> bytes:
 
 
 def fade_out(pcm: bytes, samples: int) -> bytes:
-=======
     """Fade out over the last `samples` samples."""
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
     samples = min(samples, len(pcm) // 2)
     if samples <= 0:
         return pcm
@@ -439,10 +425,6 @@ class Mixer:
     the mix then grows with the sounds added (each one can be mixed as soon as
     it is ready, without keeping them all), and to_bytes(seconds) gives it its
     final length.
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 
     Without audioop (Python 3.13 and later, so the Android app on Python 3.14),
     the sum is kept in big integers (see "PCM arithmetic without audioop"), by

@@ -1,18 +1,18 @@
-"""Menus déroulants faits pour le doigt, les mêmes dans toute l'app.
+"""Drop-down menus made for the finger, the same throughout the app.
 
-`TouchComboBox` garde toute l'interface de QComboBox (éléments, index,
-signaux) mais n'utilise pas sa liste : celle de Qt est pensée pour la souris.
-Sur téléphone elle s'ouvrait et se refermait toute seule, choisissait la ligne
-sous le doigt au moindre glissement et restait en surbrillance.
+`TouchComboBox` keeps the whole QComboBox interface (items, index,
+signals) but does not use its list: Qt's is designed for the mouse.
+On a phone it opened and closed by itself, picked the row under the
+finger at the slightest slide and stayed highlighted.
 
-- La case s'ouvre sur un vrai toucher : appui puis relâché sur la case, sans
-  glisser. Faire défiler une barre en partant d'une case ne l'ouvre pas, et la
-  molette de la souris ne change plus la valeur par accident.
-- Pas de bouton flèche : toute la case est le bouton.
-- La liste (`ChoiceSheet`) s'ouvre au milieu de l'écran, par-dessus un voile :
-  grandes lignes, choix actuel coché et visible, défilement au doigt.
-- Une ligne n'est choisie que si le doigt n'a pas glissé et que la liste n'a
-  pas défilé ; toucher le voile (ou Échap / retour) ferme sans rien changer.
+- The box opens on a real tap: press then release on the box, without
+  sliding. Scrolling a bar starting from a box does not open it, and the
+  mouse wheel no longer changes the value by accident.
+- No arrow button: the whole box is the button.
+- The list (`ChoiceSheet`) opens in the middle of the screen, over a veil:
+  big rows, current choice checked and visible, finger scrolling.
+- A row is only chosen if the finger did not slide and the list did not
+  scroll; tapping the veil (or Esc / Back) closes without changing anything.
 """
 
 from __future__ import annotations
@@ -31,9 +31,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-SLOP = 14            # px : au-delà, le doigt a glissé (ce n'est plus un toucher)
-ROW_HEIGHT = 44      # px : hauteur d'une ligne (cible confortable pour le doigt)
-GUARD_S = 0.25       # s : la liste ignore les touchers juste après son ouverture
+SLOP = 14            # px: beyond this, the finger slid (no longer a tap)
+ROW_HEIGHT = 44      # px: height of a row (comfortable target for the finger)
+GUARD_S = 0.25       # s: the list ignores taps right after it opens
 CARD_MAX_WIDTH = 460
 
 
@@ -50,7 +50,7 @@ def _moved(a: QPoint, b: QPoint) -> int:
 
 
 def _refresh(widget: QWidget) -> None:
-    """Réapplique la feuille de style après un changement de propriété."""
+    """Reapplies the style sheet after a property change."""
     style = widget.style()
     style.unpolish(widget)
     style.polish(widget)
@@ -60,19 +60,19 @@ def _refresh(widget: QWidget) -> None:
 class TouchComboBox(QComboBox):
     def __init__(self) -> None:
         super().__init__()
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)   # pas de surbrillance « focus »
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)   # no "focus" highlight
         self._down: QPoint | None = None
         self.sheet: ChoiceSheet | None = None
 
-    # --- Toucher ------------------------------------------------------------------------
+    # --- Touch ------------------------------------------------------------------------------
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
-            self._down = _global(event)   # on attend le relâché pour ouvrir
+            self._down = _global(event)   # wait for the release to open
         event.accept()
 
     def mouseMoveEvent(self, event) -> None:
         if self._down is not None and _moved(_global(event), self._down) > SLOP:
-            self._down = None             # le doigt glisse : ce n'est pas un toucher
+            self._down = None             # the finger slides: not a tap
         event.accept()
 
     def mouseReleaseEvent(self, event) -> None:
@@ -87,9 +87,9 @@ class TouchComboBox(QComboBox):
         event.accept()
 
     def wheelEvent(self, event) -> None:
-        event.ignore()   # la molette fait défiler la page, pas la valeur
+        event.ignore()   # the wheel scrolls the page, not the value
 
-    # --- Liste ----------------------------------------------------------------------------
+    # --- List -------------------------------------------------------------------------------
     def showPopup(self) -> None:
         if self.sheet is None and self.count() and self.isEnabled():
             self.sheet = ChoiceSheet(self)
@@ -105,7 +105,7 @@ class TouchComboBox(QComboBox):
 
 
 class ChoiceRow(QLabel):
-    """Une ligne de la liste ; choisie seulement sur un vrai toucher."""
+    """A row of the list; chosen only on a real tap."""
 
     def __init__(self, sheet: "ChoiceSheet", index: int, text: str, current: bool) -> None:
         super().__init__(("✓  " if current else "") + text)
@@ -151,7 +151,7 @@ class ChoiceRow(QLabel):
 
 
 class ChoiceSheet(QWidget):
-    """La liste d'un menu, au centre de la fenêtre, sur un voile."""
+    """A menu's list, in the centre of the window, over a veil."""
 
     def __init__(self, combo: TouchComboBox) -> None:
         window = combo.window()
@@ -192,15 +192,15 @@ class ChoiceSheet(QWidget):
 
         self.place()
         window.installEventFilter(self)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)   # reçoit Échap / retour
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)   # receives Esc / Back
         self.show()
         self.raise_()
         self.setFocus()
-        if 0 <= current < len(self.rows):  # le choix actuel, au milieu de la liste
+        if 0 <= current < len(self.rows):  # the current choice, in the middle of the list
             self.list_area.ensureWidgetVisible(self.rows[current], 0,
                                             max(0, self.card.height() // 2 - ROW_HEIGHT))
 
-    # --- Placement ------------------------------------------------------------------------
+    # --- Placement --------------------------------------------------------------------------
     def place(self) -> None:
         w, h = self.window_.width(), self.window_.height()
         self.setGeometry(0, 0, w, h)
@@ -214,7 +214,7 @@ class ChoiceSheet(QWidget):
             self.place()
         return False
 
-    # --- État -----------------------------------------------------------------------------
+    # --- State ------------------------------------------------------------------------------
     def guarded(self) -> bool:
         return time.monotonic() - self.opened < GUARD_S
 
@@ -227,12 +227,12 @@ class ChoiceSheet(QWidget):
         state = QScroller.scroller(self.list_area.viewport()).state()
         return state in (QScroller.State.Dragging, QScroller.State.Scrolling)
 
-    # --- Choisir / fermer -------------------------------------------------------------------
+    # --- Choose / close ---------------------------------------------------------------------
     def choose(self, index: int) -> None:
         combo = self.combo
         self.dismiss()
         if index != combo.currentIndex():
-            combo.setCurrentIndex(index)   # émet currentIndexChanged comme avant
+            combo.setCurrentIndex(index)   # emits currentIndexChanged as before
 
     def dismiss(self) -> None:
         if self.combo.sheet is not self:
@@ -242,7 +242,7 @@ class ChoiceSheet(QWidget):
         self.deleteLater()
         self.combo._sheet_closed()
 
-    # --- Voile ----------------------------------------------------------------------------
+    # --- Veil -------------------------------------------------------------------------------
     def paintEvent(self, event) -> None:
         p = QPainter(self)
         p.fillRect(self.rect(), QColor(0, 0, 0, 120))
@@ -257,7 +257,7 @@ class ChoiceSheet(QWidget):
         down, self._down = self._down, None
         if (down is not None and _moved(_global(event), down) <= SLOP
                 and not self.card.geometry().contains(event.position().toPoint())):
-            self.dismiss()   # toucher à côté de la liste : on ferme sans rien changer
+            self.dismiss()   # tap beside the list: close without changing anything
         event.accept()
 
     def keyPressEvent(self, event) -> None:
@@ -265,7 +265,7 @@ class ChoiceSheet(QWidget):
             self.dismiss()
             event.accept()
         elif event.key() == Qt.Key.Key_Back:
-            event.accept()   # fermé au relâché (sinon Android quitte l'app)
+            event.accept()   # closed on release (otherwise Android leaves the app)
         else:
             super().keyPressEvent(event)
 

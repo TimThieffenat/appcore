@@ -1,15 +1,15 @@
-"""Calcul des positions d'accords jouables et de leurs doigtés (partagé par les apps du socle).
+"""Computing playable chord positions and their fingerings (shared by the base's apps).
 
-Sans dépendance à Qt. Fonctionne avec n'importe quel accordage.
+No dependency on Qt. Works with any tuning.
 
-Règles utilisées pour qu'une position soit jouable :
-- la note la plus grave est la tonique de l'accord (position fondamentale) ;
-- les cordes jouées forment un bloc continu (pas de corde étouffée au milieu) ;
-- au moins 4 cordes jouées ;
-- toutes les notes de l'accord sont présentes (la quinte juste peut manquer
-  dans les accords de 4 sons ou plus) ;
-- les doigts tiennent dans 4 cases (écart maximum de 3 cases) ;
-- 4 doigts maximum, avec barré de l'index ou petit barré d'un autre doigt.
+Rules used for a position to be playable:
+- the lowest note is the chord's root (root position);
+- the strings played form a continuous block (no muted string in the middle);
+- at least 4 strings played;
+- all chord notes are present (the perfect fifth may be missing
+  in chords of 4 notes or more);
+- the fingers fit within 4 frets (maximum spread of 3 frets);
+- 4 fingers at most, with an index barre or a small barre by another finger.
 """
 
 from __future__ import annotations
@@ -20,13 +20,13 @@ from itertools import product
 
 from appcore import music_theory as mt
 
-MAX_SPAN = 3  # écart maximal entre la case la plus basse et la plus haute
-MAX_FRET_WITH_OPEN = 3  # cordes à vide seulement avec des cases basses
+MAX_SPAN = 3  # maximum spread between the lowest and the highest fret
+MAX_FRET_WITH_OPEN = 3  # open strings only with low frets
 
 STANDARD_TUNING = (4, 9, 2, 7, 11, 4)  # E A D G B E
 
-# Formes d'accords ouverts « de référence » (accordage standard), favorisées
-# pour que le bas du manche affiche les doigtés que tout le monde apprend.
+# "Reference" open chord shapes (standard tuning), favoured so that
+# the bottom of the neck shows the fingerings everyone learns.
 STANDARD_SHAPES = {
     ("C", "Major"): "x32010", ("C", "7 (dominant)"): "x32310",
     ("C", "Major 7"): "x32000", ("C", "add9"): "x32030",
@@ -46,11 +46,11 @@ STANDARD_SHAPES = {
 }
 STANDARD_BONUS = 12.0
 
-# Formes barrées classiques, déplaçables le long du manche (accordage
-# standard). Décalages de case par corde, depuis la case de la tonique sur
-# la corde grave de la forme ; None = corde étouffée.
+# Classic barre shapes, movable along the neck (standard
+# tuning). Fret offsets per string, from the root's fret on
+# the shape's lowest string; None = muted string.
 MOVABLE_SHAPES = {
-    # forme de mi, forme de la, forme de ré, forme de do
+    # E shape, A shape, D shape, C shape
     "Major": [(0, 2, 2, 1, 0, 0), (None, 0, 2, 2, 2, 0),
                (None, None, 0, 2, 3, 2), (None, 0, -1, -3, -2, -3)],
     "Minor": [(0, 2, 2, 0, 0, 0), (None, 0, 2, 2, 1, 0),
@@ -75,9 +75,9 @@ def _parse_shape(shape: str) -> tuple[int, ...]:
 
 
 def standard_offset(tuning: tuple[int, ...]) -> int | None:
-    """De combien de demi-tons l'accordage est l'accordage standard monté
-    (capo, ou accordage standard transposé comme « Half step down ») ; None
-    sinon. Les formes de référence s'appliquent alors telles quelles."""
+    """By how many semitones the tuning is standard tuning raised
+    (capo, or a transposed standard tuning such as "Half step down"); None
+    otherwise. The reference shapes then apply as they are."""
     if len(tuning) != len(STANDARD_TUNING):
         return None
     for shift in range(12):
@@ -89,56 +89,56 @@ def standard_offset(tuning: tuple[int, ...]) -> int | None:
 @dataclass(frozen=True)
 class Barre:
     fret: int
-    first: int   # corde de début (index, 0 = corde la plus grave)
-    last: int    # corde de fin
+    first: int   # first string (index, 0 = lowest string)
+    last: int    # last string
     finger: int
 
 
 @dataclass(frozen=True)
 class Voicing:
-    frets: tuple[int, ...]    # par corde, grave -> aigu ; -1 étouffée, 0 à vide
-    fingers: tuple[int, ...]  # 0 = aucun doigt
+    frets: tuple[int, ...]    # per string, low -> high; -1 muted, 0 open
+    fingers: tuple[int, ...]  # 0 = no finger
     barres: tuple[Barre, ...]
-    score: float             # qualité de la position (plus haut = mieux)
-    standard: bool = False   # forme d'accord ouvert de référence
-    movable: bool = False    # forme barrée classique (forme de mi, de la...)
+    score: float             # quality of the position (higher = better)
+    standard: bool = False   # reference open chord shape
+    movable: bool = False    # classic barre shape (E shape, A shape...)
 
     @property
     def rank(self) -> float:
-        """Score + bonus des formes classiques (pour le bas du manche)."""
+        """Score + bonus of the classic shapes (for the bottom of the neck)."""
         return self.score + (STANDARD_BONUS if self.standard else 0.0) \
             + (MOVABLE_BONUS if self.movable else 0.0)
 
     @property
     def rank_without_open(self) -> float:
-        """Score + bonus des formes barrées seulement (plus haut sur le manche)."""
+        """Score + bonus of the barre shapes only (higher up the neck)."""
         return self.score + (MOVABLE_BONUS if self.movable else 0.0)
 
     @property
     def position(self) -> int:
-        """0 pour un accord ouvert, sinon la case la plus basse jouée."""
+        """0 for an open chord, otherwise the lowest fret played."""
         if any(f == 0 for f in self.frets):
             return 0
         return min(f for f in self.frets if f > 0)
 
     @property
     def base_fret(self) -> int:
-        """Première case affichée dans un diagramme de 5 cases."""
+        """First fret shown in a 5-fret diagram."""
         fretted = [f for f in self.frets if f > 0]
         if not fretted or max(fretted) <= 5:
             return 1
         return min(fretted)
 
 
-# --- Doigtés -------------------------------------------------------------------
+# --- Fingerings -------------------------------------------------------------------
 
 def _assign(notes: list[tuple[int, int]], first: int, last: int,
             base_fret: int) -> tuple[dict[int, int], list[Barre]] | None:
-    """Donne un doigt à chaque note (corde, case), du plus grave au plus aigu.
+    """Gives a finger to each note (string, fret), from lowest to highest.
 
-    Le doigt idéal suit la case (index sur base_fret, majeur une case plus
-    haut...). Si les doigts manquent, les notes de la case la plus haute sur
-    des cordes voisines sont jouées en petit barré par un seul doigt.
+    The ideal finger follows the fret (index on base_fret, middle one fret
+    higher...). If fingers run out, the notes of the highest fret on
+    neighbouring strings are played as a small barre by a single finger.
     """
     if not notes:
         return {}, []
@@ -147,7 +147,7 @@ def _assign(notes: list[tuple[int, int]], first: int, last: int,
     if len(groups) > last - first + 1:
         top = max(f for _, f in notes)
         strings = sorted(s for s, f in notes if f == top)
-        # plus longue suite de cordes voisines sur la case la plus haute
+        # longest run of neighbouring strings on the highest fret
         runs, run = [], [strings[0]]
         for s in strings[1:]:
             if s == run[-1] + 1:
@@ -187,7 +187,7 @@ def _assign(notes: list[tuple[int, int]], first: int, last: int,
 
 
 def fingering(frets: tuple[int, ...]) -> tuple[tuple[int, ...], tuple[Barre, ...]] | None:
-    """Trouve un doigté pour une position, ou None si injouable."""
+    """Finds a fingering for a position, or None if unplayable."""
     fretted = [(s, f) for s, f in enumerate(frets) if f > 0]
     count = len(frets)
     if not fretted:
@@ -200,18 +200,18 @@ def fingering(frets: tuple[int, ...]) -> tuple[tuple[int, ...], tuple[Barre, ...
 
     at_low = [s for s, f in fretted if f == low]
 
-    # 1) Sans barré de l'index (sauf deux cordes voisines sur la case la
-    #    plus basse avec 3 doigts ou plus : l'index les barre, comme dans Dm7)
+    # 1) Without an index barre (except two neighbouring strings on the
+    #    lowest fret with 3 fingers or more: the index bars them, as in Dm7)
     simple = _assign(fretted, 1, 4, low)
     two_adjacent = len(at_low) == 2 and at_low[1] - at_low[0] == 1
     if simple is not None and len(fretted) <= 4:
         if not (two_adjacent and len(set(simple[0].values())) >= 3):
             return pack(simple)
 
-    # 2) Barré de l'index sur la case la plus basse
+    # 2) Index barre on the lowest fret
     if len(at_low) >= 2:
         lo, hi = min(at_low), max(at_low)
-        # toutes les cordes sous le barré doivent être frettées (pas à vide)
+        # all strings under the barre must be fretted (not open)
         if all(frets[s] >= low for s in range(lo, hi + 1)):
             rest = [(s, f) for s, f in fretted if f > low]
             sub = _assign(rest, 2, 4, low)
@@ -224,7 +224,7 @@ def fingering(frets: tuple[int, ...]) -> tuple[tuple[int, ...], tuple[Barre, ...
     return pack(simple) if simple is not None else None
 
 
-# --- Recherche des positions ---------------------------------------------------
+# --- Searching positions ---------------------------------------------------
 
 def _score(frets, fingers, barres, missing_fifth: bool) -> float:
     sounding = [f for f in frets if f >= 0]
@@ -237,13 +237,13 @@ def _score(frets, fingers, barres, missing_fifth: bool) -> float:
         score -= 2.0
     for b in barres:
         if b.finger == 4 and b.last - b.first >= 2:
-            score -= 3.0  # petit barré de l'auriculaire sur 3 cordes : difficile
+            score -= 3.0  # small little-finger barre on 3 strings: hard
         elif b.finger != 1:
             score -= 1.0
     if missing_fifth:
         score -= 6.0
-    score += 0.5 * opens  # cordes à vide : son plus ample, plus facile
-    # cordes aiguës étouffées : moins agréable à gratter
+    score += 0.5 * opens  # open strings: fuller sound, easier
+    # muted high strings: less pleasant to strum
     top_muted = 0
     for f in reversed(frets):
         if f >= 0:
@@ -256,7 +256,7 @@ def _score(frets, fingers, barres, missing_fifth: bool) -> float:
 @lru_cache(maxsize=512)
 def all_voicings(root: str, type_name: str, tuning: tuple[int, ...],
                  max_fret: int = 15) -> tuple[Voicing, ...]:
-    """Toutes les positions jouables de l'accord, de la meilleure à la moins bonne."""
+    """All playable positions of the chord, from best to worst."""
     notes = mt.build_notes(root, mt.CHORDS[type_name][1])
     chord_pcs = {n.pc for n in notes}
     root_pc = mt.note_pc(root)
@@ -298,7 +298,7 @@ def all_voicings(root: str, type_name: str, tuning: tuple[int, ...],
             if len(sounding) < min_strings:
                 continue
             if sounding[-1] - sounding[0] + 1 != len(sounding):
-                continue  # corde étouffée au milieu
+                continue  # muted string in the middle
             bass = sounding[0]
             if (tuning[bass] + frets[bass]) % 12 != root_pc:
                 continue
@@ -309,7 +309,7 @@ def all_voicings(root: str, type_name: str, tuning: tuple[int, ...],
             if fretted and max(fretted) - min(fretted) > MAX_SPAN:
                 continue
             if fretted and 0 in frets and max(fretted) > MAX_FRET_WITH_OPEN:
-                continue  # cordes à vide mélangées à des cases hautes
+                continue  # open strings mixed with high frets
             result = fingering(frets)
             if result is None:
                 continue
@@ -326,7 +326,7 @@ def all_voicings(root: str, type_name: str, tuning: tuple[int, ...],
 
 def spread_voicings(root: str, type_name: str, tuning: tuple[int, ...],
                     count: int = 8) -> list[Voicing]:
-    """Les meilleures positions réparties le long du manche, triées par case."""
+    """The best positions spread along the neck, sorted by fret."""
     candidates = all_voicings(root, type_name, tuning)
     if not candidates:
         return []
@@ -336,7 +336,7 @@ def spread_voicings(root: str, type_name: str, tuning: tuple[int, ...],
         if v.score < best_score - 8 and not (v.standard or v.movable):
             continue
         if v.position > 12:
-            continue  # au-delà de la 12e case, ce sont les mêmes une octave plus haut
+            continue  # beyond the 12th fret, they are the same an octave higher
         if all(abs(v.position - c.position) >= 2 for c in chosen):
             chosen.append(v)
         if len(chosen) == count:
@@ -346,7 +346,7 @@ def spread_voicings(root: str, type_name: str, tuning: tuple[int, ...],
 
 def best_voicing(root: str, type_name: str, tuning: tuple[int, ...],
                  target: int = 0) -> Voicing | None:
-    """La meilleure position proche de la case visée (0 = bas du manche)."""
+    """The best position near the target fret (0 = bottom of the neck)."""
     candidates = all_voicings(root, type_name, tuning)
     if not candidates:
         return None
@@ -361,11 +361,11 @@ def best_voicing(root: str, type_name: str, tuning: tuple[int, ...],
 
 def voicing_at(root: str, type_name: str, tuning: tuple[int, ...],
                fret: int) -> Voicing | None:
-    """La meilleure position dans la zone de 5 cases qui commence à `fret`.
+    """The best position in the 5-fret zone starting at `fret`.
 
-    Contrairement à `best_voicing`, la zone est respectée : pour jouer une suite
-    « vers la 5e case », tous les accords restent entre les cases 4 et 9.
-    fret = 0 : accords ouverts (bas du manche).
+    Unlike `best_voicing`, the zone is kept: to play a progression
+    "around the 5th fret", all chords stay between frets 4 and 9.
+    fret = 0: open chords (bottom of the neck).
     """
     if fret <= 0:
         return best_voicing(root, type_name, tuning, 0)
@@ -375,7 +375,7 @@ def voicing_at(root: str, type_name: str, tuning: tuple[int, ...],
         fretted = [f for f in v.frets if f > 0]
         return (min(fretted), max(fretted)) if fretted else (0, 0)
 
-    for below, above in ((1, 4), (2, 5), (3, 6)):  # zone, puis un peu plus large
+    for below, above in ((1, 4), (2, 5), (3, 6)):  # the zone, then a bit wider
         inside = [v for v in candidates
                   if zone(v)[0] >= fret - below and 0 < zone(v)[1] <= fret + above]
         if inside:

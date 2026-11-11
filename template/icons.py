@@ -1,7 +1,7 @@
-"""Icônes de l'app, dessinées en code (grille de 24 × 24, traits arrondis).
+"""The app's icons, drawn in code (24 × 24 grid, rounded strokes).
 
-Le dessin et les icônes communes (réglages, lecture, stats, trophée, étoile…)
-sont dans appcore/icons.py ; celles de l'app y sont enregistrées ici.
+The drawing and the common icons (settings, play, stats, trophy, star…)
+are in appcore/icons.py; the app's are registered there from here.
 """
 
 from __future__ import annotations

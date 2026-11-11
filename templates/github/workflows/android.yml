@@ -1,23 +1,24 @@
-# Compile l'APK Android de test dans le cloud (GitHub Actions), sans rien installer.
-# Fichier du socle (appcore/templates/github/workflows/) : le même pour toutes
-# les apps, tout ce qui est propre à l'app vient de son app_info.py.
-# Lancer : onglet « Actions » du dépôt > « Android APK » > « Run workflow ».
-# L'APK se télécharge ensuite dans les « Artifacts » du run.
+# Builds the test Android APK in the cloud (GitHub Actions), with nothing to install.
+# Base file (appcore/templates/github/workflows/): the same for every
+# app, everything specific to the app comes from its app_info.py.
+# Run: the repository's "Actions" tab > "Android APK" > "Run workflow".
+# The APK can then be downloaded from the run's "Artifacts".
 #
-# Signature : toujours la même clé (voir appcore/android/signing_key.sh), pour
-# que le téléphone accepte la nouvelle version par-dessus l'ancienne. Avec les
-# secrets KEYSTORE_B64 et KEYSTORE_PASSWORD (clé d'envoi Google Play), c'est
-# cette clé ; sans eux, une clé de test gardée dans le cache de GitHub.
+# Signing: always the same key (see appcore/android/signing_key.sh), so that
+# the phone accepts the new version over the old one. With the
+# KEYSTORE_B64 and KEYSTORE_PASSWORD secrets (Google Play upload key), it is
+# that key; without them, a test key kept in GitHub's cache.
 #
-# Le socle est un sous-module (appcore/) : s'il est dans un dépôt privé, ajouter
-# le secret APPCORE_TOKEN (jeton GitHub avec accès en lecture à ce dépôt).
+# The base is a submodule (appcore/): if it is in a private repository, add
+# the APPCORE_TOKEN secret (GitHub token with read access to that repository
+# and to the app's).
 name: Android APK
 
 on:
   workflow_dispatch:
     inputs:
       target_api:
-        description: "Version d'Android visée (targetSdk). 36 = Android 16, exigé par Google Play"
+        description: "Target Android version (targetSdk). 36 = Android 16, required by Google Play"
         required: false
         default: "36"
   push:
@@ -90,4 +91,4 @@ jobs:
         with:
           name: ${{ env.APP_NAME }}-apk
           path: dist/*.apk
-          retention-days: 7   # l'APK (~150 Mo) est supprimé après 7 jours : quota de 500 Mo
+          retention-days: 7   # the APK (~150 MB) is deleted after 7 days: 500 MB quota

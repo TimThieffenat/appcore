@@ -1,24 +1,24 @@
-"""Police de symboles intégrée : flèches, ♭ ♯, ▶ ◀, ♬, ✓, ✕, ★… sur tous les téléphones.
+"""Built-in symbols font: arrows, ♭ ♯, ▶ ◀, ♬, ✓, ✕, ★… on every phone.
 
-Sur certains téléphones, la police d'Android n'a pas tous ces symboles, et Qt
-ne trouve pas toujours une autre police qui les a : ils s'affichaient en
-carrés vides (constaté dans RiffFinder : clavier ↶ ♬ ✕ ↗, accords « ♭VII → I »,
-rythmes ↓ ↑…).
+On some phones, Android's font does not have all these symbols, and Qt
+does not always find another font that has them: they showed as empty
+boxes (seen in RiffFinder: keyboard ↶ ♬ ✕ ↗, chords "♭VII → I",
+rhythms ↓ ↑…).
 
-Deux polices, les symboles de DejaVu Sans renommés (voir tools/build_font.py) :
-- celle de l'app, « <App> Symbols » (symbol_font_data.py à la racine de l'app),
-  avec les symboles écrits dans son code ;
-- celle du socle, « AppCore Symbols » (appcore/symbol_font_data.py), avec ceux
-  du socle et les plus courants. Une app sans police à elle marche donc aussi.
+Two fonts, the DejaVu Sans symbols renamed (see tools/build_font.py):
+- the app's, "<App> Symbols" (symbol_font_data.py at the app's root),
+  with the symbols written in its code;
+- the base's, "AppCore Symbols" (appcore/symbol_font_data.py), with the
+  base's ones and the most common. An app without its own font works too.
 
-install() les charge et les place en secours de la police du texte : le texte
-garde la police du téléphone, et chaque caractère qu'elle n'a pas est pris dans
-la police de l'app, puis dans celle du socle, avant toute police du système.
+install() loads them and sets them as fallbacks of the text font: text
+keeps the phone's font, and each character it lacks is taken from the
+app's font, then from the base's, before any system font.
 
-Comment : QFont.insertSubstitution(police du texte, la nôtre). Qt essaie les
-« substituts » d'une police, dans l'ordre, pour chaque caractère manquant ;
-cela vaut pour toutes les polices de l'app qui partent de celle du texte
-(étiquettes, boutons, dessins des pages, listes déroulantes…).
+How: QFont.insertSubstitution(text font, ours). Qt tries a font's
+"substitutes", in order, for each missing character; this applies to
+every font of the app derived from the text font
+(labels, buttons, page drawings, drop-down lists…).
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ import zlib
 
 
 def _sources() -> list:
-    """Les modules de données : celui de l'app (s'il existe), puis celui du socle."""
+    """The data modules: the app's (if it exists), then the base's."""
     found = []
     for name in ("symbol_font_data", "appcore.symbol_font_data"):
         try:
@@ -47,19 +47,19 @@ def families() -> list[str]:
 
 
 def chars() -> str:
-    """Tous les symboles couverts (app + socle)."""
+    """All covered symbols (app + base)."""
     return "".join(sorted({c for m in _sources() for c in getattr(m, "CHARS", "")}))
 
 
 def font_files(module) -> list[bytes]:
-    """Les deux fichiers TTF (normale, grasse) d'un module de données."""
+    """The two TTF files (regular, bold) of a data module."""
     return [zlib.decompress(base64.b64decode(face)) for face in (module.REGULAR, module.BOLD)]
 
 
 def install(app) -> bool:
-    """À appeler juste après avoir créé la QApplication, avant toute fenêtre.
-    Renvoie False si aucune police n'a pu être chargée (l'app marche quand
-    même, avec les polices du système)."""
+    """Call right after creating the QApplication, before any window.
+    Returns False if no font could be loaded (the app works anyway,
+    with the system fonts)."""
     from PySide6.QtCore import QByteArray
     from PySide6.QtGui import QFont, QFontDatabase, QFontInfo
 
@@ -73,21 +73,21 @@ def install(app) -> bool:
     if not loaded:
         return False
     base = app.font()
-    # La police réellement utilisée pour le texte (« Roboto » sur Android), et
-    # non le nom demandé, qui peut être un alias (« Sans Serif ») : un alias
-    # inconnu de Qt ferait de nos symboles la police principale.
+    # The font really used for text ("Roboto" on Android), and not the
+    # requested name, which can be an alias ("Sans Serif"): an alias
+    # unknown to Qt would make our symbols the main font.
     text_family = QFontInfo(base).family()
     if not text_family or text_family in loaded:
         return False
-    # + le nom demandé s'il existe vraiment : sur Android, les polices de Qt
-    # pour les listes, menus, bulles d'aide… s'appellent « Roboto »
+    # + the requested name if it really exists: on Android, Qt's fonts
+    # for lists, menus, tooltips… are called "Roboto"
     names = [text_family] + [name for name in base.families()
                              if name != text_family and name not in loaded
                              and QFontDatabase.hasFamily(name)]
     for name in names:
-        for family in loaded:            # l'app d'abord, puis le socle
+        for family in loaded:            # the app first, then the base
             QFont.insertSubstitution(name, family)
-    font = QFont(base)              # même taille ; nouvelle police, sans cache d'avant
+    font = QFont(base)              # same size; new font, without the previous cache
     font.setFamilies([text_family])
     app.setFont(font)
     return True

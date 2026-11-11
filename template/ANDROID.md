@@ -1,9 +1,9 @@
-# Compiler __APP_NAME__ pour Android
+# Building __APP_NAME__ for Android
 
-Toute la compilation est celle du socle : voir **appcore/ANDROID.md**.
-Ce qui est propre à l'app est dans `app_info.py` (paquet Google Play,
-autorisations, alias et fichier de la clé d'envoi, dossiers à embarquer).
+The whole build is the base's: see **appcore/ANDROID.md**.
+What is specific to the app is in `app_info.py` (Google Play package,
+permissions, alias and file of the upload key, folders to bundle).
 
-Notes propres à __APP_NAME__ :
+Notes specific to __APP_NAME__:
 
 - …

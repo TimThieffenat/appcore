@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 #
-# Fabrique l'AAB signé pour Google Play (paquet ANDROID_PACKAGE de app_info.py,
-# par exemple com.rifffinder.app).
+# Makes the signed AAB for Google Play (package ANDROID_PACKAGE of app_info.py,
+# for example com.rifffinder.app).
 #
-# Pré-requis : avoir lancé  bash appcore/android/build_apk.sh  au moins une fois
-# (il prépare le venv, le SDK, le NDK et le fichier buildozer.spec).
+# Prerequisite: having run  bash appcore/android/build_apk.sh  at least once
+# (it prepares the venv, the SDK, the NDK and the buildozer.spec file).
 #
-#   bash appcore/android/release_aab.sh                # construit l'AAB
-#   VERSION_CODE=2 bash appcore/android/release_aab.sh # à chaque nouvel envoi sur Play
+#   bash appcore/android/release_aab.sh                # builds the AAB
+#   VERSION_CODE=2 bash appcore/android/release_aab.sh # for each new upload to Play
 #
-# Signature : crée la clé UNE fois avec  bash appcore/android/make_keystore.sh
-# puis garde ~/<KEYSTORE_NAME> + son mot de passe en lieu sûr (2 copies).
+# Signing: create the key ONCE with  bash appcore/android/make_keystore.sh
+# then keep ~/<KEYSTORE_NAME> + its password somewhere safe (2 copies).
 #
 set -euo pipefail
 
-CORE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)    # le socle (appcore/)
-ROOT=${APP_ROOT:-$(cd "$CORE/.." && pwd)}                # le dossier de l'app
+CORE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)    # the base (appcore/)
+ROOT=${APP_ROOT:-$(cd "$CORE/.." && pwd)}                # the app's folder
 CONFIG=$(python3 "$CORE/android/app_config.py" "$ROOT") || exit 1
 eval "$CONFIG"
 BUILD=${BUILD_DIR:-$ROOT/build/android}
@@ -23,24 +23,24 @@ APP=$BUILD/app
 VENV=$BUILD/venv
 DIST=$ROOT/dist
 
-# PACKAGE_DOMAIN + PACKAGE_NAME = ANDROID_PACKAGE (définitif après publication)
-VERSION_CODE=${VERSION_CODE:-1}       # entier, à augmenter à CHAQUE envoi sur Play
+# PACKAGE_DOMAIN + PACKAGE_NAME = ANDROID_PACKAGE (final once published)
+VERSION_CODE=${VERSION_CODE:-1}       # integer, to increase for EACH upload to Play
 VERSION_NAME=$APP_VERSION
 APP_LABEL=$APP_NAME
 KEYSTORE=${KEYSTORE:-$HOME/$APP_KEYSTORE_NAME}
 KEY_ALIAS=${KEY_ALIAS:-$APP_KEY_ALIAS}
 
-fail() { printf '\n\033[1;31mERREUR : %s\033[0m\n' "$*" >&2; exit 1; }
+fail() { printf '\n\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 
-[ -d "$APP" ] || fail "lance d'abord : bash appcore/android/build_apk.sh"
-[ -f "$KEYSTORE" ] || fail "clé introuvable ($KEYSTORE). Crée-la avec : bash appcore/android/make_keystore.sh"
+[ -d "$APP" ] || fail "run first: bash appcore/android/build_apk.sh"
+[ -f "$KEYSTORE" ] || fail "key not found ($KEYSTORE). Create it with: bash appcore/android/make_keystore.sh"
 export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}
 export PATH="$JAVA_HOME/bin:$VENV/bin:$PATH"
 
-# Mot de passe : variable KEYSTORE_PASSWORD (GitHub Actions), sinon demandé
+# Password: KEYSTORE_PASSWORD variable (GitHub Actions), else asked
 PW=${KEYSTORE_PASSWORD:-}
 if [ -z "$PW" ]; then
-    read -r -s -p "Mot de passe de la clé : " PW; echo
+    read -r -s -p "Key password: " PW; echo
 fi
 export P4A_RELEASE_KEYSTORE=$KEYSTORE
 export P4A_RELEASE_KEYALIAS=$KEY_ALIAS
@@ -49,11 +49,11 @@ export P4A_RELEASE_KEYALIAS_PASSWD=$PW
 
 cd "$APP"
 SPEC=$(find . -maxdepth 2 -name buildozer.spec | head -1)
-[ -n "$SPEC" ] || fail "buildozer.spec introuvable dans $APP (lance appcore/android/build_apk.sh jusqu'au bout une fois)"
-echo "Spec : $SPEC"
+[ -n "$SPEC" ] || fail "buildozer.spec not found in $APP (run appcore/android/build_apk.sh to the end once)"
+echo "Spec: $SPEC"
 cp "$SPEC" "$SPEC.bak"
 
-set_spec() {   # set_spec clé valeur : remplace la ligne ou l'ajoute dans [app]
+set_spec() {   # set_spec key value: replaces the line or adds it in [app]
     if grep -qE "^[#[:space:]]*$1[[:space:]]*=" "$SPEC"; then
         sed -i -E "s|^[#[:space:]]*$1[[:space:]]*=.*|$1 = $2|" "$SPEC"
     else
@@ -66,26 +66,26 @@ set_spec version "$VERSION_NAME"
 set_spec android.numeric_version "$VERSION_CODE"
 set_spec android.release_artifact aab
 set_spec android.archs arm64-v8a
-set_spec android.api "${APPCORE_ANDROID_API:-36}"   # Google Play : API 36 exigée depuis fin août 2026
-# minSdk : Google Play exige au moins 24 (protection automatique Play) et Qt 6.8+
-# ne fonctionne qu'à partir d'Android 9 (API 28). Même valeur que build_apk.sh
-# (patch min-api), pour réutiliser ce qui est déjà compilé.
+set_spec android.api "${APPCORE_ANDROID_API:-36}"   # Google Play: API 36 required since late August 2026
+# minSdk: Google Play requires at least 24 (Play automatic protection) and Qt 6.8+
+# only works from Android 9 (API 28). Same value as build_apk.sh
+# (min-api patch), to reuse what is already built.
 set_spec android.minapi "${APPCORE_ANDROID_MINAPI:-28}"
 set_spec android.accept_sdk_license True
-# Indispensable pour la version Google Play : sans ce correctif, Qt ne trouve
-# pas les modules PySide6 et l'app se ferme après son logo (android/p4a_hook.py)
+# Essential for the Google Play version: without this fix, Qt does not find
+# the PySide6 modules and the app closes after its logo (android/p4a_hook.py)
 cp "$CORE/android/p4a_hook.py" "$BUILD/p4a_hook.py"
 set_spec p4a.hook "$BUILD/p4a_hook.py"
-# App allégée (bibliothèques Qt inutilisées retirées) : la recette PySide6,
-# rejouée pour l'AAB, appelle android/slim_bundle.py comme dans build_apk.sh
+# Slimmed app (unused Qt libraries removed): the PySide6 recipe,
+# run again for the AAB, calls android/slim_bundle.py as in build_apk.sh
 cp "$CORE/android/slim_bundle.py" "$BUILD/slim_bundle.py"
 export APPCORE_SLIM=${APPCORE_SLIM-$BUILD/slim_bundle.py}
 grep -E "^(package\.|version|p4a\.hook|android\.(numeric_version|release_artifact|archs|api|minapi|ndk_api|permissions))" "$SPEC" || true
 
-# Le dossier de travail de buildozer est celui du spec
+# buildozer's working folder is the spec's
 cd "$(dirname "$SPEC")"
-# build_apk.sh a rangé le dossier de compilation dans deployment/ : on le
-# remet en place pour réutiliser ce qui est déjà compilé
+# build_apk.sh moved the build folder into deployment/: put it
+# back in place to reuse what is already built
 if [ ! -d .buildozer ] && [ -d deployment/.buildozer ]; then
     mv deployment/.buildozer .buildozer
 fi
@@ -97,12 +97,12 @@ for f in bin/*.aab ./*.aab; do
     [ -f "$f" ] || continue
     cp "$f" "$DIST/$APP_LABEL-$VERSION_NAME-$VERSION_CODE.aab"; found=1
 done
-[ $found -eq 1 ] || fail "aucun .aab produit (voir les messages ci-dessus)"
+[ $found -eq 1 ] || fail "no .aab produced (see the messages above)"
 ls -lh "$DIST"/*.aab
-# Pages de 16 Ko : Google Play refuse les bibliothèques alignées sur 4 Ko
+# 16 KB pages: Google Play refuses libraries aligned on 4 KB
 "$VENV/bin/python" "$CORE/android/check_16k.py" "$DIST/$APP_LABEL-$VERSION_NAME-$VERSION_CODE.aab" \
-    || printf '\n\033[1;33mAttention : AAB pas entièrement compatible 16 Ko (voir ci-dessus).\033[0m\n' >&2
-# Bibliothèques chargées par Qt au démarrage : toutes présentes, sinon l'app se ferme
+    || printf '\n\033[1;33mWarning: AAB not fully 16 KB compatible (see above).\033[0m\n' >&2
+# Libraries loaded by Qt at start-up: all present, otherwise the app closes
 "$VENV/bin/python" "$CORE/android/check_qt_libs.py" "$DIST/$APP_LABEL-$VERSION_NAME-$VERSION_CODE.aab" \
-    || fail "l'AAB se fermerait au démarrage : bibliothèques de Qt manquantes (voir ci-dessus)"
-echo "Envoie ce fichier dans la Play Console (Test fermé > Créer une release)."
+    || fail "the AAB would close at start-up: Qt libraries missing (see above)"
+echo "Upload this file to the Play Console (Closed testing > Create a release)."

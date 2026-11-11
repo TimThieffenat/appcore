@@ -1,30 +1,30 @@
-// Modèle du socle (appcore/android/java/) : build_apk.sh y met le paquet Java,
-// le nom de l'app (app_info.py) et le range dans le dossier de son paquet.
-// Utilisé seulement si l'app n'a pas son propre AppHooks.java (android/java/
-// de l'app, dans son paquet Java) : celui-ci ne fait rien.
+// Base template (appcore/android/java/): build_apk.sh fills in the Java package
+// and the app's name (app_info.py) and puts it in its package's folder.
+// Only used if the app does not have its own AppHooks.java (the app's
+// android/java/, in its Java package): this one does nothing.
 package @JAVA_PACKAGE@;
 
 import android.app.Activity;
 
 /**
- * Crochets de l'app dans l'activité principale (KeepAwakeActivity du socle).
- * Une app qui a du Java à elle (achat dans l'app, notifications…) écrit son
- * propre AppHooks.java dans android/java/<son paquet>/ avec ces trois méthodes.
- * Les erreurs sont rattrapées par l'activité.
+ * The app's hooks into the main activity (the base's KeepAwakeActivity).
+ * An app with Java of its own (in-app purchase, notifications…) writes its
+ * own AppHooks.java in android/java/<its package>/ with these three methods.
+ * Errors are caught by the activity.
  */
 final class AppHooks {
     private AppHooks() {
     }
 
-    /** Juste après la création de l'activité (Python démarre ensuite). */
+    /** Right after the activity is created (Python starts afterwards). */
     static void onCreate(Activity activity) {
     }
 
-    /** À chaque retour au premier plan. */
+    /** Each time the app comes back to the foreground. */
     static void onResume(Activity activity) {
     }
 
-    /** Réponse de l'utilisateur à une demande d'autorisation. */
+    /** The user's answer to a permission request. */
     static void onRequestPermissionsResult(Activity activity, int requestCode,
                                            String[] permissions, int[] grantResults) {
     }

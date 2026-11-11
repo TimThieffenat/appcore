@@ -1,12 +1,12 @@
-"""Théorie musicale de base : notes, degrés, gammes, accords, arpèges.
+"""Basic music theory: notes, degrees, scales, chords, arpeggios.
 
-Aucune dépendance à Qt ici, pour pouvoir tester et réutiliser ce module
-ailleurs (par exemple dans une future version mobile).
+No dependency on Qt here, so the module can be tested and reused
+elsewhere.
 
-Principe : chaque gamme / accord est décrit par sa liste de degrés
-("1", "b3", "5"...). À partir de la tonique et des degrés, on calcule :
-- la classe de hauteur de chaque note (0 = C, 1 = C#/Db, ... 11 = B)
-- son nom correctement orthographié (B♭ dans F majeur, pas A♯)
+Principle: each scale / chord is described by its list of degrees
+("1", "b3", "5"...). From the root and the degrees, we compute:
+- the pitch class of each note (0 = C, 1 = C#/Db, ... 11 = B)
+- its correctly spelled name (B♭ in F major, not A♯)
 """
 
 from __future__ import annotations
@@ -19,15 +19,15 @@ from appcore.i18n import tr
 LETTERS = "CDEFGAB"
 NATURAL_PC = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 SOLFEGE = {"C": "Do", "D": "Re", "E": "Mi", "F": "Fa", "G": "Sol", "A": "La", "B": "Si"}
-# Orthographe propre à certaines langues (Ré en français ; Dó, Ré, Fá, Lá en portugais)
+# Spelling specific to some languages (Ré in French; Dó, Ré, Fá, Lá in Portuguese)
 SOLFEGE_SPELLING = {"fr": {"D": "Ré"}, "pt": {"C": "Dó", "D": "Ré", "F": "Fá", "A": "Lá"}}
 
-# Notation des noms de notes : clé interne -> libellé affiché (voir notation_label)
+# Note-name notation: internal key -> displayed label (see notation_label)
 NOTATIONS = {"letters": "Letters (C D E)", "solfege": "Solfège (Do Re Mi)"}
 
 
 def solfege(letter: str) -> str:
-    """Nom de la note en solfège, écrit comme dans la langue de l'app."""
+    """Solfège note name, written as in the app's language."""
     return SOLFEGE_SPELLING.get(i18n.language(), {}).get(letter, SOLFEGE[letter])
 
 
@@ -36,11 +36,11 @@ def notation_label(key: str) -> str:
         return tr("Solfège ({notes})", notes=" ".join(solfege(x) for x in "CDE"))
     return tr("Letters (C D E)")
 
-# Demi-tons de chaque degré dans la gamme majeure (référence des degrés).
+# Semitones of each degree in the major scale (reference of the degrees).
 MAJOR_STEPS = {1: 0, 2: 2, 3: 4, 4: 5, 5: 7, 6: 9, 7: 11}
 
-# Toniques proposées (les touches noires sous leurs deux noms, pour que
-# l'orthographe des notes soit juste : G♯ mineur et A♭ majeur, par exemple).
+# Roots offered (black keys under both their names, so that note
+# spelling is right: G♯ minor and A♭ major, for example).
 ROOTS = [
     "C", "C#", "Db", "D", "D#", "Eb", "E", "F",
     "F#", "Gb", "G", "G#", "Ab", "A", "A#", "Bb", "B",
@@ -63,7 +63,7 @@ SCALES = {
     "Phrygian dominant": ["1", "b2", "3", "4", "5", "b6", "b7"],
 }
 
-# Nom affiché -> (suffixe du symbole d'accord, degrés)
+# Displayed name -> (chord symbol suffix, degrees)
 CHORDS = {
     "Major": ("", ["1", "3", "5"]),
     "Minor": ("m", ["1", "b3", "5"]),
@@ -86,9 +86,9 @@ CHORDS = {
     "Minor 9": ("m9", ["1", "b3", "5", "b7", "9"]),
 }
 
-MODES = ["Scale", "Chord"]  # un arpège = les notes de l'accord : même affichage
+MODES = ["Scale", "Chord"]  # an arpeggio = the chord's notes: same display
 
-# Accordages : noms des cordes de la plus grave à la plus aiguë.
+# Tunings: string names from lowest to highest.
 TUNINGS = {
     "Standard (E A D G B E)": ["E", "A", "D", "G", "B", "E"],
     "Drop D (D A D G B E)": ["D", "A", "D", "G", "B", "E"],
@@ -98,15 +98,15 @@ TUNINGS = {
     "Open D (D A D F# A D)": ["D", "A", "D", "F#", "A", "D"],
 }
 
-# Les couleurs des degrés dépendent du thème : voir style.py.
+# Degree colours depend on the theme: see style.py.
 
 
 @dataclass(frozen=True)
 class NoteInfo:
-    pc: int       # classe de hauteur, 0..11 (0 = C)
+    pc: int       # pitch class, 0..11 (0 = C)
     degree: str   # "1", "b3", "#11"...
-    letter: str   # lettre de la note : "C".."B"
-    accidental: int  # -2..2 (bémols négatifs, dièses positifs)
+    letter: str   # note letter: "C".."B"
+    accidental: int  # -2..2 (flats negative, sharps positive)
 
 
 def parse_note(name: str) -> tuple[str, int]:
@@ -131,7 +131,7 @@ def parse_degree(degree: str) -> tuple[int, int]:
 
 
 def degree_family(degree: str) -> int:
-    """Ramène 9, 11, 13 à 2, 4, 6."""
+    """Brings 9, 11, 13 back to 2, 4, 6."""
     _, number = parse_degree(degree)
     return (number - 1) % 7 + 1
 
@@ -142,7 +142,7 @@ def degree_semitones(degree: str) -> int:
 
 
 def build_notes(root: str, degrees: list[str]) -> list[NoteInfo]:
-    """Calcule les notes (bien orthographiées) à partir de la tonique."""
+    """Computes the (correctly spelled) notes from the root."""
     root_letter, _ = parse_note(root)
     root_pc = note_pc(root)
     notes = []
@@ -165,7 +165,7 @@ def types_for(mode: str) -> list[str]:
     return list(SCALES) if mode == "Scale" else list(CHORDS)
 
 
-# --- Affichage -------------------------------------------------------------
+# --- Display -------------------------------------------------------------
 
 def format_accidental(accidental: int) -> str:
     return "♯" * accidental if accidental > 0 else "♭" * -accidental
@@ -186,7 +186,7 @@ def format_degree(degree: str) -> str:
 
 
 def chromatic_name(pc: int, notation: str = "letters") -> str:
-    """Nom neutre d'une classe de hauteur : 'C', 'C♯/D♭'..."""
+    """Neutral name of a pitch class: 'C', 'C♯/D♭'..."""
     for letter, natural in NATURAL_PC.items():
         if natural == pc:
             return format_note(letter, 0, notation)
@@ -196,8 +196,8 @@ def chromatic_name(pc: int, notation: str = "letters") -> str:
 
 
 def scale_words(scale_name: str) -> str:
-    """Nom de gamme traduit, à placer dans une phrase (sans majuscule, sauf en
-    allemand)."""
+    """Translated scale name, to put in a sentence (no capital, except in
+    German)."""
     name = tr(scale_name)
     if i18n.language() != "de":
         name = name[:1].lower() + name[1:]
@@ -205,18 +205,18 @@ def scale_words(scale_name: str) -> str:
 
 
 def scale_title(root_text: str, scale_name: str) -> str:
-    """« A minor pentatonic », « La pentatonique mineure »… (nom de gamme traduit,
-    sans majuscule sauf en allemand, où les noms en prennent toujours une)."""
+    """"A minor pentatonic", "La pentatonique mineure"… (translated scale name,
+    no capital except in German, where nouns always take one)."""
     return tr("{root} {scale}", root=root_text, scale=scale_words(scale_name))
 
 
 def mode_name(mode: str) -> str:
-    """« major » / « minor » dans une phrase (« A minor »), traduit."""
+    """"major" / "minor" in a sentence ("A minor"), translated."""
     return tr("major") if mode == "Major" else tr("minor") if mode == "Minor" else tr(mode)
 
 
 def key_title(root: str, mode: str, notation: str = "letters") -> str:
-    """Nom d'une tonalité : « A minor », « La mineur », « a-Moll »…"""
+    """A key's name: "A minor", "La mineur", "a-Moll"…"""
     return tr("{root} {mode}", root=format_root(root, notation), mode=mode_name(mode))
 
 
@@ -229,5 +229,5 @@ def selection_title(root: str, mode: str, type_name: str, notation: str) -> str:
 
 
 def normalize_notation(value) -> str:
-    """Accepte aussi les anciennes valeurs enregistrées (« anglaise », « latine »)."""
+    """Also accepts old saved values ("anglaise", "latine")."""
     return "solfege" if value in ("solfege", "latine") else "letters"

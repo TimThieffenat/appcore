@@ -1,9 +1,9 @@
-"""Accès partagé au son : une seule lecture et un seul synthétiseur pour l'app.
+"""Shared access to sound: a single playback and a single synthesiser for the app.
 
-L'instrument est un réglage (clé SOUND_SETTING de app_info.py, par exemple
-« sound/guitar »), choisi parmi les VOICES de l'app. Une app peut compléter ce
-module dans son propre sound.py (`from appcore.sound import *` puis ses
-raccourcis : jouer un accord, une question…).
+The instrument is a setting (key SOUND_SETTING of app_info.py, for example
+"sound/guitar"), chosen among the app's VOICES. An app can extend this
+module in its own sound.py (`from appcore.sound import *` then its
+shortcuts: play a chord, a question…).
 """
 
 from __future__ import annotations
@@ -19,12 +19,12 @@ from appcore.guitar_synth import DEFAULT_VOICE, VOICES, GuitarSynth
 
 _playback: Playback | None = None
 _synth: GuitarSynth | None = None
-_voice_allowed = None    # voir set_voice_filter
+_voice_allowed = None    # see set_voice_filter
 
 
 def set_voice_filter(allowed) -> None:
-    """`allowed(voice) -> bool` : un instrument réservé (version Pro…) qui n'est
-    pas permis redevient le premier de l'app. None : tous permis."""
+    """`allowed(voice) -> bool`: a reserved instrument (Pro version…) that is
+    not allowed falls back to the app's first one. None: all allowed."""
     global _voice_allowed
     _voice_allowed = allowed
 
@@ -34,7 +34,7 @@ def voice_allowed(key: str) -> bool:
         return True
     try:
         return bool(_voice_allowed(key))
-    except Exception:  # noqa: BLE001 — en cas de doute : l'instrument de base
+    except Exception:  # noqa: BLE001 — when in doubt: the basic instrument
         return False
 
 
@@ -46,7 +46,7 @@ def playback() -> Playback:
 
 
 def voices() -> list[str]:
-    """Les instruments que l'app propose (VOICES de app_info.py), dans l'ordre."""
+    """The instruments the app offers (VOICES of app_info.py), in order."""
     chosen = [v for v in app.get("VOICES") if v in VOICES]
     return chosen or [DEFAULT_VOICE]
 
@@ -56,14 +56,14 @@ def setting_key() -> str:
 
 
 def voice() -> str:
-    """L'instrument choisi dans les réglages (sinon le premier de l'app)."""
+    """The instrument chosen in the settings (else the app's first one)."""
     available = voices()
     value = str(QSettings().value(setting_key(), available[0]))
     return value if value in available and voice_allowed(value) else available[0]
 
 
 def synth() -> GuitarSynth:
-    """Le synthétiseur de l'instrument choisi (refait si le réglage a changé)."""
+    """The synthesiser of the chosen instrument (rebuilt if the setting changed)."""
     global _synth
     current = voice()
     if _synth is None or _synth.voice != current:
@@ -74,7 +74,7 @@ def synth() -> GuitarSynth:
 
 
 def start_warm_up() -> None:
-    """Prépare les notes en arrière-plan (WARM_UP_NOTES de app_info.py :
-    les plus utilisées d'abord)."""
+    """Prepares the notes in the background (WARM_UP_NOTES of app_info.py:
+    most used first)."""
     order = [int(n) for n in app.get("WARM_UP_NOTES")]
     threading.Thread(target=synth().warm_up, args=(order,), daemon=True).start()

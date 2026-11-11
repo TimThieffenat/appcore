@@ -1,14 +1,14 @@
-# Compile l'AAB signé pour Google Play (fichier du socle, le même pour toutes les apps).
-# Lancer : Actions > Android AAB (Play Store) > Run workflow (version_code = 1, 2, 3…).
-# Secrets nécessaires : KEYSTORE_B64 et KEYSTORE_PASSWORD (clé d'envoi, voir keystore.yml),
-# et APPCORE_TOKEN si le socle (sous-module appcore/) est dans un dépôt privé.
+# Builds the signed AAB for Google Play (base file, the same for every app).
+# Run: Actions > Android AAB (Play Store) > Run workflow (version_code = 1, 2, 3…).
+# Secrets needed: KEYSTORE_B64 and KEYSTORE_PASSWORD (upload key, see keystore.yml),
+# and APPCORE_TOKEN if the base (appcore/ submodule) is in a private repository.
 name: Android AAB (Play Store)
 
 on:
   workflow_dispatch:
     inputs:
       version_code:
-        description: "versionCode : un entier, +1 à chaque envoi sur Google Play"
+        description: "versionCode: an integer, +1 for each upload to Google Play"
         required: true
         default: "1"
 

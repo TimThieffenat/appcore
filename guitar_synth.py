@@ -1,33 +1,29 @@
-"""Le son des notes : guitare acoustique enregistrée, ou clavier synthétisé.
+"""The sound of notes: recorded acoustic guitar, or synthesised keyboard.
 
-Trois instruments : guitare à cordes acier (sounds/guitar), à cordes nylon
-(sounds/guitar_nylon), voir sounds/CREDITS.md, et un clavier doux synthétisé
-(pour les musiciens qui ne jouent pas de la guitare). Une note sans enregistrement est obtenue en transposant la plus
-proche. Si les fichiers manquent, une corde pincée synthétisée
-(Karplus-Strong) prend le relais.
+Three instruments: steel-string guitar (sounds/guitar), nylon-string guitar
+(sounds/guitar_nylon), see sounds/CREDITS.md, and a soft synthesised keyboard
+(for musicians who do not play the guitar). A note with no recording is obtained by transposing the
+nearest one. If the files are missing, a synthesised plucked string
+(Karplus-Strong) takes over.
 
-Chaque app choisit les instruments qu'elle propose (VOICES de son app_info.py).
-`played(..., cents=…)` donne une note volontairement désaccordée ; la voix
-« keys » (clavier) est calculée note par note. Les enregistrements sont dans
-appcore/sounds/ (voir sounds/CREDITS.md), partagés par toutes les apps.
+Each app chooses the instruments it offers (VOICES of its app_info.py).
+`played(..., cents=…)` gives a deliberately detuned note; the "keys"
+voice (keyboard) is computed note by note. The recordings are in
+appcore/sounds/ (see sounds/CREDITS.md), shared by all apps.
 
-<<<<<<< Updated upstream
-Sans Qt et sans dépendance externe :
-- chaque hauteur est préparée une fois, gardée en mémoire et, si un dossier
-  de cache est donné, sur disque (instantané ensuite) ;
-- le mixage utilise le module standard « audioop » quand il existe
-  (Python ≤ 3.12, donc sur Android), sinon une version pur Python plus lente.
-=======
 Without Qt and without external dependencies:
 - each pitch is prepared once, kept in memory and, if a cache folder
   is given, on disk (instant afterwards);
 - mixing uses the standard "audioop" module when it exists
   (Python ≤ 3.12), otherwise big integers used as vectors of samples
   (see "PCM arithmetic without audioop"): no work per sample in Python.
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 
-Format produit : PCM 16 bits signé, mono, à la fréquence d'échantillonnage
-choisie (celle de la sortie audio).
+Output format: signed 16-bit PCM, mono, at the chosen sample rate
+(the audio output's).
 """
 
 from __future__ import annotations
@@ -48,32 +44,32 @@ from pathlib import Path
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", DeprecationWarning)
-    try:  # rapide (code C) ; retiré de Python 3.13 (paquet « audioop-lts » sinon)
+    try:  # fast (C code); removed in Python 3.13 (else the "audioop-lts" package)
         import audioop
     except ImportError:
         audioop = None
 
 log = logging.getLogger(__name__)
 
-CACHE_VERSION = "v2"   # v2 : enregistrements réels
+CACHE_VERSION = "v2"   # v2: real recordings
 SOUNDS_DIR = Path(__file__).with_name("sounds")
 GUITAR_DIR = SOUNDS_DIR / "guitar"
-# Instruments au choix : nom -> (libellé, dossier des enregistrements ou None)
+# Instruments to choose from: name -> (label, recordings folder or None)
 VOICES = {
     "steel": ("Steel-string acoustic", "guitar"),
     "nylon": ("Nylon-string (classical)", "guitar_nylon"),
     "keys": ("Soft keys (all musicians)", None),
 }
 DEFAULT_VOICE = "steel"
-<<<<<<< Updated upstream
-KEYS_RATE = 22050      # le clavier est calculé à cette fréquence, puis converti
-=======
 KEYS_RATE = 22050      # the keyboard is computed at this rate, then converted
 # Notes at a given volume are kept ready (a touched note then sounds at once); a
 # note is about 250 KB: beyond this size, they are dropped and prepared again
 # when needed.
 VARIANTS_BYTES = 64 * 1024 * 1024
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 
 
 def voice_dir(voice: str) -> Path | None:
@@ -82,7 +78,7 @@ def voice_dir(voice: str) -> Path | None:
 
 
 def load_snd(path: Path) -> tuple[int, bytes] | None:
-    """Fichier .snd : zlib( fréquence uint32 + PCM 16 bits mono ). None si illisible."""
+    """.snd file: zlib( rate uint32 + 16-bit mono PCM ). None if unreadable."""
     try:
         data = zlib.decompress(path.read_bytes())
     except (OSError, zlib.error):
@@ -100,21 +96,21 @@ def load_snd(path: Path) -> tuple[int, bytes] | None:
 
 
 def resample(pcm: bytes, in_rate: float, out_rate: int) -> bytes:
-    """Change la fréquence d'échantillonnage. Avec in_rate plus grand que la
-    fréquence réelle de l'enregistrement, la note est transposée vers l'aigu."""
+    """Changes the sample rate. With in_rate higher than the recording's
+    real rate, the note is transposed upwards."""
     in_rate = max(1, int(round(in_rate)))
     if in_rate == out_rate:
         return pcm
     if audioop:
         return audioop.ratecv(pcm, 2, 1, in_rate, out_rate, None)[0]
-    # Sans audioop (Python 3.13 et plus, donc l'app Android en Python 3.14) :
-    # interpolation linéaire écrite avec map() et les opérateurs du module
-    # operator, sans boucle Python par échantillon (environ 10 fois plus rapide).
+    # Without audioop (Python 3.13 and later, so the Android app on Python 3.14):
+    # linear interpolation written with map() and the operator module's
+    # functions, without a Python loop per sample (about 10 times faster).
     src = array("h")
     src.frombytes(pcm)
     if len(src) < 2:
         return pcm
-    src.append(src[-1])              # le dernier échantillon a un voisin
+    src.append(src[-1])              # the last sample has a neighbour
     step = in_rate / out_rate
     count = int((len(src) - 2) / step)
     pos = list(map(mul, range(count), repeat(step)))
@@ -128,7 +124,7 @@ _SAMPLE_NOTES: dict[str, list[int]] = {}
 
 
 def sample_notes(voice: str = DEFAULT_VOICE) -> list[int]:
-    """Les notes MIDI enregistrées d'une guitare (vide si le dossier manque)."""
+    """The recorded MIDI notes of a guitar (empty if the folder is missing)."""
     if voice not in _SAMPLE_NOTES:
         folder = voice_dir(voice)
         try:
@@ -153,26 +149,26 @@ def _to_int16(samples) -> array:
 
 def pluck(freq: float, sample_rate: int, seconds: float, seed: int = 7,
           pick_position: float = 0.14) -> array:
-    """Corde pincée : bruit filtré qui boucle dans une ligne à retard."""
+    """Plucked string: filtered noise looping in a delay line."""
     period = sample_rate / freq
     length = int(period - 0.5)
     frac = period - 0.5 - length
-    if frac < 0.1:  # garde le filtre passe-tout stable
+    if frac < 0.1:  # keeps the all-pass filter stable
         length -= 1
         frac += 1.0
     length = max(2, length)
-    coef = (1.0 - frac) / (1.0 + frac)  # retard fractionnaire : justesse exacte
+    coef = (1.0 - frac) / (1.0 + frac)  # fractional delay: exact tuning
 
     rnd = random.Random(seed)
     excite = [rnd.uniform(-1.0, 1.0) for _ in range(length)]
-    for _ in range(2):  # attaque plus douce (médiator, pas lame de rasoir)
+    for _ in range(2):  # softer attack (a pick, not a razor blade)
         excite = [0.5 * (excite[i] + excite[i - 1]) for i in range(length)]
-    gap = max(1, int(round(pick_position * length)))  # position du médiator
+    gap = max(1, int(round(pick_position * length)))  # pick position
     excite = [excite[i] - 0.7 * excite[i - gap] for i in range(length)]
     mean = sum(excite) / length
     buf = [x - mean for x in excite]
 
-    # déclin : les graves sonnent plus longtemps que les aigus
+    # decay: low notes ring longer than high ones
     t60 = max(1.6, min(6.0, 8.2 - 0.072 * (12 * math.log2(freq / 440.0) + 69)))
     decay = 0.001 ** (1.0 / (t60 * freq))
 
@@ -192,9 +188,9 @@ def pluck(freq: float, sample_rate: int, seconds: float, seed: int = 7,
         idx += 1
         if idx == length:
             idx = 0
-        body += 0.45 * (x - body)  # légère chaleur (passe-bas)
+        body += 0.45 * (x - body)  # slight warmth (low-pass)
         out[n] = body
-    # micro fondu d'entrée / sortie : pas de clic
+    # tiny fade in / out: no click
     fade_in = min(total, int(0.002 * sample_rate))
     for i in range(fade_in):
         out[i] *= i / fade_in
@@ -205,7 +201,7 @@ def pluck(freq: float, sample_rate: int, seconds: float, seed: int = 7,
 
 
 def noise_burst(sample_rate: int, seconds: float = 0.035, seed: int = 3) -> array:
-    """Coup étouffé (« chuck ») : bruit sourd très court."""
+    """Muted strum ("chuck"): very short dull noise."""
     rnd = random.Random(seed)
     total = int(sample_rate * seconds)
     out = []
@@ -217,15 +213,15 @@ def noise_burst(sample_rate: int, seconds: float = 0.035, seed: int = 3) -> arra
 
 
 def keys_tone(freq: float, sample_rate: int = KEYS_RATE, seconds: float = 2.2) -> array:
-    """Note de clavier doux (piano électrique) : quelques harmoniques qui
-    s'éteignent, les aiguës plus vite, et un léger « tintement » à l'attaque."""
+    """Soft keyboard note (electric piano): a few harmonics that
+    die out, the high ones faster, and a slight "tine" at the attack."""
     total = int(sample_rate * seconds)
     out = array("f", bytes(4 * total))
     nyquist = sample_rate / 2
-    # (rang de l'harmonique, volume, durée de déclin en s)
+    # (harmonic rank, volume, decay time in s)
     partials = [(1.0, 1.0, 1.25), (2.0, 0.42, 0.65), (3.0, 0.20, 0.42),
                 (4.0, 0.10, 0.30), (5.0, 0.05, 0.22), (7.03, 0.10, 0.05)]
-    low_boost = max(0.0, min(1.0, (300.0 - freq) / 250.0))   # graves plus ronds
+    low_boost = max(0.0, min(1.0, (300.0 - freq) / 250.0))   # rounder low notes
     for ratio, amp, tau in partials:
         f = freq * ratio
         if f >= nyquist * 0.9:
@@ -234,7 +230,7 @@ def keys_tone(freq: float, sample_rate: int = KEYS_RATE, seconds: float = 2.2) -
             amp *= 1.0 - 0.5 * low_boost
         tau *= max(0.5, min(1.6, 440.0 / freq) ** 0.35)
         w = 2 * math.pi * f / sample_rate
-        # sinus par rotation (2 multiplications par échantillon)
+        # sine by rotation (2 multiplications per sample)
         c, s = math.cos(w), math.sin(w)
         x, y = 1.0, 0.0
         k = math.exp(-1.0 / (tau * sample_rate))
@@ -252,9 +248,6 @@ def keys_tone(freq: float, sample_rate: int = KEYS_RATE, seconds: float = 2.2) -
     return _to_int16(out)
 
 
-<<<<<<< Updated upstream
-# --- Opérations PCM (audioop si disponible) ----------------------------------------------
-=======
 # --- PCM arithmetic without audioop: big integers as vectors -------------------------------
 #
 # Without audioop (Python 3.13 and later, so the Android app), anything done sample
@@ -363,7 +356,10 @@ def _scale_fast(pcm: bytes, gain: float) -> bytes:
 
 
 # --- PCM operations (audioop if available) ----------------------------------------------
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 
 def scale(pcm: bytes, gain: float) -> bytes:
     if gain == 1.0:
@@ -374,8 +370,8 @@ def scale(pcm: bytes, gain: float) -> bytes:
         return _scale_fast(pcm[:len(pcm) // 2 * 2], gain)
     data = array("h")
     data.frombytes(pcm)
-    values = array("i", map(int, map(mul, data, repeat(gain))))   # sans boucle Python
-    if values and (min(values) < -32768 or max(values) > 32767):  # gain > 1 : écrêter
+    values = array("i", map(int, map(mul, data, repeat(gain))))   # without a Python loop
+    if values and (min(values) < -32768 or max(values) > 32767):  # gain > 1: clip
         values = array("i", (max(-32768, min(32767, x)) for x in values))
     return array("h", values).tobytes()
 
@@ -387,11 +383,9 @@ def _ramp(samples: array, weights) -> bytes:
 
 
 def fade_out(pcm: bytes, samples: int) -> bytes:
-<<<<<<< Updated upstream
-    """Fondu de sortie sur les `samples` derniers échantillons (petit : pur Python)."""
 =======
     """Fade out over the last `samples` samples."""
->>>>>>> Stashed changes
+>>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
     samples = min(samples, len(pcm) // 2)
     if samples <= 0:
         return pcm
@@ -411,24 +405,24 @@ def fade_in(pcm: bytes, samples: int) -> bytes:
 
 @dataclass
 class Performance:
-    """Un son prêt à jouer : PCM 16 bits mono, sa durée, et des événements
-    (temps, valeur) que l'interface utilise pour surligner ce qui joue
-    (audio_player.Playback). Les apps les fabriquent (leur performance.py)."""
+    """A sound ready to play: 16-bit mono PCM, its duration, and events
+    (time, value) the interface uses to highlight what plays
+    (audio_player.Playback). Apps build them (their performance.py)."""
 
     pcm: bytes
     sample_rate: int
     duration: float
     events: list[tuple[float, object]] = field(default_factory=list)
-    # Son « touché » (une note, un accord) : le son suivant ne le coupe pas, il
-    # continue de sonner, sauf sur les cordes que le suivant rejoue. Une suite
-    # (lick, gamme, morceau) s'éteint, elle, quand on joue autre chose.
+    # A "struck" sound (a note, a chord): the next sound does not cut it, it
+    # keeps ringing, except on the strings the next one plays again. A sequence
+    # (lick, scale, song) dies out when something else is played.
     one_shot: bool = False
-    strings: frozenset[int] = frozenset()   # cordes jouées (n° dans l'accordage)
+    strings: frozenset[int] = frozenset()   # strings played (index in the tuning)
 
 
 def arpeggio(synth: "GuitarSynth", midis, step: float = 0.18, seconds: float = 1.6,
              gain: float = 0.55) -> Performance:
-    """Des notes jouées l'une après l'autre (essai d'un instrument, réglages)."""
+    """Notes played one after the other (trying an instrument, settings)."""
     sr = synth.sample_rate
     midis = list(midis)
     total = step * max(0, len(midis) - 1) + seconds + 0.3
@@ -439,18 +433,16 @@ def arpeggio(synth: "GuitarSynth", midis, step: float = 0.18, seconds: float = 1
 
 
 class Mixer:
-    """Somme de sons placés dans le temps, chacun avec son volume.
+    """Sum of sounds placed in time, each with its volume.
 
-<<<<<<< Updated upstream
-    Sans audioop (Python 3.13 et plus, donc l'app Android en Python 3.14), la
-    somme se fait en nombres à virgule, volume compris, en une passe par son et
-    sans boucle Python par échantillon ; l'écrêtage n'a lieu qu'à la fin."""
-=======
     `seconds`: the length of the whole. None when it is not known in advance:
     the mix then grows with the sounds added (each one can be mixed as soon as
     it is ready, without keeping them all), and to_bytes(seconds) gives it its
     final length.
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> cd8568b2db1df3c3447fb719d6d9f9337386d048
 
     Without audioop (Python 3.13 and later, so the Android app on Python 3.14),
     the sum is kept in big integers (see "PCM arithmetic without audioop"), by
@@ -571,10 +563,10 @@ class Mixer:
         return mixed + bytes(2 * length - len(mixed))   # silence up to the length asked for
 
 
-# --- Le synthétiseur ---------------------------------------------------------------------
+# --- The synthesiser ---------------------------------------------------------------------
 
 class GuitarSynth:
-    """Fournit le son de chaque note (calculé une fois, puis en cache)."""
+    """Supplies the sound of each note (computed once, then cached)."""
 
     def __init__(self, sample_rate: int = 44100, cache_dir: Path | None = None,
                  voice: str = DEFAULT_VOICE) -> None:
@@ -588,7 +580,7 @@ class GuitarSynth:
         self._lock = threading.Lock()
         self._chuck: bytes | None = None
 
-    # Note complète (laisse sonner) -----------------------------------------------------
+    # Full note (let ring) -----------------------------------------------------------------
     def note(self, midi: int) -> bytes:
         midi = int(midi)
         with self._lock:
@@ -602,7 +594,7 @@ class GuitarSynth:
             self._store(midi, pcm)
         if pcm is None:
             pcm = self._recorded(midi)
-            if pcm is None:  # pas d'enregistrement : corde synthétisée
+            if pcm is None:  # no recording: synthesised string
                 seconds = max(1.3, min(3.0, 3.6 - 0.035 * (midi - 40)))
                 pcm = pluck(midi_freq(midi), self.sample_rate, seconds, seed=midi).tobytes()
             self._store(midi, pcm)
@@ -611,12 +603,12 @@ class GuitarSynth:
         return pcm
 
     def _recorded(self, midi: int) -> bytes | None:
-        """La note enregistrée la plus proche, transposée si besoin."""
+        """The nearest recorded note, transposed if needed."""
         notes = sample_notes(self.voice)
         if not notes:
             return None
-        # la plus proche ; à égalité, celle du dessus (transposer vers le grave
-        # sonne plus naturel que vers l'aigu)
+        # the nearest; on a tie, the one above (transposing down
+        # sounds more natural than up)
         source = min(notes, key=lambda n: (abs(n - midi), -n))
         folder = voice_dir(self.voice)
         loaded = load_snd(folder / f"{source}.snd") if folder else None
@@ -646,18 +638,18 @@ class GuitarSynth:
             return
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_suffix(f".{threading.get_ident()}.tmp")  # un par fil
+            tmp = path.with_suffix(f".{threading.get_ident()}.tmp")  # one per thread
             tmp.write_bytes(pcm)
             tmp.replace(path)
         except OSError:
-            pass  # le cache disque est un bonus
+            pass  # the disk cache is a bonus
 
     def warm_up(self, midis) -> None:
-        """Prépare les notes à l'avance (à lancer dans un fil d'arrière-plan)."""
+        """Prepares the notes in advance (run it in a background thread)."""
         for midi in midis:
             self.note(midi)
 
-    # Variantes ----------------------------------------------------------------------------
+    # Variants -------------------------------------------------------------------------------
     def _cached(self, key: tuple, make) -> bytes:
         with self._lock:
             pcm = self._variants.get(key)
@@ -673,8 +665,8 @@ class GuitarSynth:
         return pcm
 
     def detuned(self, midi: int, cents: float) -> bytes:
-        """La note, plus haute (cents > 0) ou plus basse de `cents` centièmes
-        de demi-ton : l'enregistrement est lu un peu plus vite ou plus lentement."""
+        """The note, higher (cents > 0) or lower by `cents` hundredths
+        of a semitone: the recording is read a little faster or slower."""
         c = round(cents, 1)
         if not c:
             return self.note(midi)
@@ -683,8 +675,8 @@ class GuitarSynth:
 
     def played(self, midi: int, gain: float, seconds: float | None = None,
                skip: float = 0.0, muted: bool = False, cents: float = 0.0) -> bytes:
-        """Note jouée : volume, durée (étouffée en fin), attaque sautée (legato),
-        désaccord en cents (mode « Fausse note »)."""
+        """Note played: volume, duration (muted at the end), attack skipped (legato),
+        detuning in cents ("Wrong note" mode)."""
         g = round(gain, 2)
         c = round(cents, 1)
         if muted:
@@ -704,7 +696,7 @@ class GuitarSynth:
         return pcm
 
     def _muted(self, midi: int, gain: float) -> bytes:
-        """Palm mute : son sourd et court."""
+        """Palm mute: dull, short sound."""
         sr = self.sample_rate
         src = array("h")
         src.frombytes(self.note(midi)[: 2 * int(0.16 * sr)])
@@ -721,9 +713,9 @@ class GuitarSynth:
         return self._cached(("chuck", round(gain, 2)), lambda: scale(self._chuck, gain))
 
     def _dead_strum(self) -> bytes | None:
-        """« Chuck » : les six cordes frappées mais étouffées par la paume. On
-        garde l'attaque de chaque corde à vide (le bruit du médiator et le tout
-        début de la note), qu'on éteint très vite et qu'on assourdit."""
+        """"Chuck": the six strings struck but muted by the palm. The
+        attack of each open string is kept (the pick noise and the very
+        start of the note), cut off very quickly and dulled."""
         if not sample_notes(self.voice):
             return None
         sr = self.sample_rate
@@ -732,14 +724,14 @@ class GuitarSynth:
         for k, midi in enumerate((40, 45, 50, 55, 59, 64)):
             src = array("h")
             src.frombytes(self.note(midi)[: 2 * length])
-            delay = int(k * 0.0025 * sr)  # le geste balaie les cordes
+            delay = int(k * 0.0025 * sr)  # the stroke sweeps across the strings
             low = 0.0
             for i, x in enumerate(src[: length - delay]):
                 low += 0.35 * (x - low)
                 mix[i + delay] += low * math.exp(-i / (0.009 * sr))
         rnd = random.Random(5)
         hiss = 0.0
-        for i in range(length):  # un peu de frottement sur les cordes
+        for i in range(length):  # a little friction on the strings
             hiss += 0.3 * (rnd.uniform(-1.0, 1.0) - hiss)
             mix[i] += 2500.0 * hiss * math.exp(-i / (0.006 * sr))
         return _to_int16(mix).tobytes()

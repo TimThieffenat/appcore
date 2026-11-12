@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QMainWindow,
+    QSizePolicy,
     QStackedWidget,
     QToolButton,
     QVBoxLayout,
@@ -111,6 +112,11 @@ class MainWindow(QMainWindow):
                 button.setObjectName("navHome" if home else "navButton")
                 button.setIconSize(QSize(28, 28) if home else QSize(22, 22))
                 button.setFixedHeight(NAV_HEIGHT - 10)
+                # the same width for every button, whatever its label or icon
+                # size: the bar is split into equal slots, the home page centred
+                # when it is in the middle
+                button.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+                button.setMinimumWidth(1)
                 rail_layout.addWidget(button, 1)
             else:
                 button.setIconSize(QSize(20, 20))

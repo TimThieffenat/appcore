@@ -1,7 +1,7 @@
-"""Petits outils d'interface partagés par les pages (format téléphone).
+"""Small interface tools shared by the pages (phone format).
 
-Une app peut compléter ce module dans son propre ui_common.py
-(`from appcore.ui_common import *` puis ses outils à elle : capo, accordage…).
+An app can extend this module in its own ui_common.py
+(`from appcore.ui_common import *` then its own tools: capo, tuning…).
 """
 
 from __future__ import annotations
@@ -32,15 +32,15 @@ def is_android() -> bool:
 
 
 def enable_touch_scroll(area: QAbstractScrollArea) -> None:
-    """Défilement au doigt (avec inertie) sur Android."""
+    """Finger scrolling (with inertia) on Android."""
     if is_android():
         QScroller.grabGesture(area.viewport(),
                               QScroller.ScrollerGestureType.LeftMouseButtonGesture)
 
 
 def notation(settings: QSettings) -> str:
-    """Noms des notes : le réglage, sinon Do Ré Mi dans les langues où c'est
-    l'usage (français, espagnol, italien, portugais), C D E ailleurs."""
+    """Note names: the setting, else Do Ré Mi in the languages where it is
+    customary (French, Spanish, Italian, Portuguese), C D E elsewhere."""
     value = settings.value("notation")
     if value is None or value == "":
         return "solfege" if i18n.language() in i18n.SOLFEGE_LANGUAGES else "letters"
@@ -48,8 +48,8 @@ def notation(settings: QSettings) -> str:
 
 
 def fill_keys(box: QComboBox, keys, selected=None) -> None:
-    """Liste dont chaque ligne montre un texte traduit et garde la clé anglaise
-    en donnée : les réglages enregistrent la clé, quelle que soit la langue."""
+    """List whose rows show a translated text and keep the English key
+    as data: settings save the key, whatever the language."""
     box.clear()
     for key in keys:
         box.addItem(tr(key), key)
@@ -58,20 +58,20 @@ def fill_keys(box: QComboBox, keys, selected=None) -> None:
 
 
 def key_of(box: QComboBox) -> str:
-    """Clé anglaise de la ligne choisie (voir fill_keys)."""
+    """English key of the chosen row (see fill_keys)."""
     data = box.currentData()
     return str(data) if data is not None else box.currentText()
 
 
 def set_key(box: QComboBox, key) -> None:
-    """Choisit la ligne de clé `key` (sinon la première)."""
+    """Selects the row with key `key` (else the first one)."""
     index = box.findData(key) if key is not None else -1
     box.setCurrentIndex(index if index >= 0 else 0)
 
 
 def number_field(low: int, high: int, prefix: str = "", suffix: str = "") -> TouchSpinBox:
-    """Champ de nombre : clavier numérique, valeur prise à la fin de la saisie,
-    « Done » ferme le clavier pour de bon (voir touch_input)."""
+    """Number field: numeric keyboard, value taken at the end of input,
+    "Done" closes the keyboard for good (see touch_input)."""
     spin = TouchSpinBox()
     spin.setRange(low, high)
     if prefix:
@@ -82,7 +82,7 @@ def number_field(low: int, high: int, prefix: str = "", suffix: str = "") -> Tou
 
 
 def text_field(placeholder: str = "", max_length: int = 0) -> TouchLineEdit:
-    """Champ de texte : « Done » ferme le clavier pour de bon (voir touch_input)."""
+    """Text field: "Done" closes the keyboard for good (see touch_input)."""
     edit = TouchLineEdit()
     if placeholder:
         edit.setPlaceholderText(placeholder)
@@ -92,9 +92,9 @@ def text_field(placeholder: str = "", max_length: int = 0) -> TouchLineEdit:
 
 
 def combo(items: list | None = None, chars: int = 8, min_width: int = 0) -> QComboBox:
-    """Liste déroulante de largeur fixe (`chars` caractères) : les barres du haut
-    tiennent sur un petit écran ; la liste ouverte montre les textes en entier."""
-    box = TouchComboBox()   # le même menu partout (voir touch_combo)
+    """Fixed-width drop-down list (`chars` characters): top bars fit
+    on a small screen; the open list shows the full texts."""
+    box = TouchComboBox()   # the same menu everywhere (see touch_combo)
     box.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
     box.setMinimumContentsLength(chars)
     if items:
@@ -115,13 +115,13 @@ def fill_roots(box: QComboBox, selected: str, note_notation: str) -> None:
 
 
 def set_text_or_first(box: QComboBox, text) -> None:
-    """Sélectionne `text` s'il existe, sinon le premier élément."""
+    """Selects `text` if it exists, else the first item."""
     index = box.findText(str(text)) if text is not None else -1
     box.setCurrentIndex(index if index >= 0 else 0)
 
 
 def scroll_area(content: QWidget) -> QScrollArea:
-    """Zone qui défile au doigt, au fond transparent (thème sombre sur Android)."""
+    """Area scrolled with the finger, transparent background (dark theme on Android)."""
     scroll = QScrollArea()
     scroll.setObjectName("plain")
     scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -136,7 +136,7 @@ def scroll_area(content: QWidget) -> QScrollArea:
 
 def label(text: str = "", name: str = "", wrap: bool = False,
           align: Qt.AlignmentFlag | None = None) -> QLabel:
-    """Étiquette (avec un nom d'objet pour la feuille de style : "title", "muted"…)."""
+    """Label (with an object name for the style sheet: "title", "muted"…)."""
     widget = QLabel(text)
     if name:
         widget.setObjectName(name)
@@ -153,9 +153,9 @@ def top_bar() -> QHBoxLayout:
 
 
 class ToolStrip(QScrollArea):
-    """Une rangée de contrôles qui ne déborde jamais : si l'écran est trop
-    étroit, elle défile au doigt (ou à la molette) au lieu d'être coupée.
-    Sinon elle remplit la largeur comme une rangée normale."""
+    """A row of controls that never overflows: if the screen is too
+    narrow, it scrolls with the finger (or the wheel) instead of being cut.
+    Otherwise it fills the width like a normal row."""
 
     def __init__(self, row: QHBoxLayout | None = None) -> None:
         super().__init__()
@@ -201,7 +201,7 @@ def page_margins(layout) -> None:
 
 
 class ElidedLabel(QLabel):
-    """Étiquette sur une ligne qui coupe le texte trop long avec « … »."""
+    """One-line label that cuts text that is too long with "…"."""
 
     def __init__(self, text: str = "") -> None:
         super().__init__()
@@ -224,7 +224,7 @@ class ElidedLabel(QLabel):
 
 
 class OverlayPanel(QFrame):
-    """Panneau qui s'ouvre par-dessus la page, collé au bord droit."""
+    """Panel opening over the page, stuck to the right edge."""
 
     def __init__(self, page: QWidget, width: int) -> None:
         super().__init__(page)
@@ -232,14 +232,14 @@ class OverlayPanel(QFrame):
         self.page = page
         self.panel_width = width
         self.top = 56
-        self.button = None   # bouton à bascule qui ouvre ce panneau (voir bind_button)
+        self.button = None   # toggle button opening this panel (see bind_button)
         self.hide()
 
     def bind_button(self, button) -> None:
-        """Le bouton à bascule qui ouvre le panneau reste enfoncé exactement tant
-        que le panneau est ouvert, quelle que soit la façon de le fermer (bouton
-        Fermer du panneau, autre panneau, mode écriture…). Sans ça, le bouton
-        restait en surbrillance panneau fermé, et le toucher le refermait."""
+        """The toggle button opening the panel stays pressed exactly as long
+        as the panel is open, however it is closed (the panel's Close
+        button, another panel, edit mode…). Without this, the button
+        stayed highlighted with the panel closed, and tapping it closed it again."""
         self.button = button
 
     def place(self, top: int | None = None) -> None:
@@ -256,13 +256,13 @@ class OverlayPanel(QFrame):
         self.setVisible(opened)
         button = self.button
         if button is not None and button.isChecked() != opened:
-            button.blockSignals(True)   # sans rouvrir / refermer le panneau
+            button.blockSignals(True)   # without reopening / closing the panel
             button.setChecked(opened)
             button.blockSignals(False)
 
 
 class SegmentBar(QFrame):
-    """Cadre qui regroupe des boutons « segment » (contrôle segmenté)."""
+    """Frame grouping "segment" buttons (segmented control)."""
 
     def __init__(self) -> None:
         super().__init__()

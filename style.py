@@ -1,19 +1,19 @@
-"""Thèmes des apps.
+"""The apps' themes.
 
-- light : blanc, rose et turquoise pastel, sobre.
-- dark : noir et gris, accents néon.
-- system (par défaut) : celui du téléphone ou de l'ordinateur, clair ou
-  sombre, et l'app suit quand il change.
+- light: white, pastel pink and turquoise, understated.
+- dark: black and grey, neon accents.
+- system (default): the phone's or computer's, light or
+  dark, and the app follows when it changes.
 
-Chaque thème définit les couleurs de l'interface, celles du manche, de l'or
-(étoiles, XP), de la flamme et de la glace, et celles des degrés (fill =
-remplissage de la pastille, ink = couleur du texte coloré). Les dessins faits à
-la main lisent current_palette(). Les tailles sont pensées pour un téléphone en
-paysage (~850 × 390 dp) et restent confortables sur ordinateur.
+Each theme defines the interface colours, those of the neck, gold
+(stars, XP), flame and ice, and those of the degrees (fill =
+the dot's fill, ink = colour of coloured text). Hand-drawn widgets
+read current_palette(). Sizes are designed for a phone in
+landscape (~850 × 390 dp) and stay comfortable on desktop.
 
-Une app ajoute sa propre feuille de style (ses objets nommés : puces, gros
-compteurs…) avec add_qss(), ou boot.run(pages, qss=...) : mêmes champs
-{couleur} que ci-dessous, accolades doublées ({{ }}).
+An app adds its own style sheet (its named objects: chips, big
+counters…) with add_qss(), or boot.run(pages, qss=...): same
+{colour} fields as below, doubled braces ({{ }}).
 """
 
 from PySide6.QtCore import Qt, QTimer
@@ -24,7 +24,7 @@ _BASE = """
 QWidget {{ font-size: 14px; color: {text}; }}
 QMainWindow, QStackedWidget, QWidget#page {{ background: {bg}; }}
 
-/* Rail de navigation (icônes à gauche) */
+/* Navigation rail (icons on the left) */
 QFrame#rail {{ background: {surface}; border: none; border-right: 1px solid {border}; }}
 QToolButton#navButton {{
     background: transparent; color: {muted}; border: none; border-radius: 12px;
@@ -33,13 +33,22 @@ QToolButton#navButton {{
 QToolButton#navButton:hover {{ background: {hover}; color: {text}; }}
 QToolButton#navButton:checked {{ background: {accent_soft}; color: {accent_text}; font-weight: 600; }}
 
-/* Titres et textes */
+/* Bottom navigation bar (portrait): the home page stands out */
+QFrame#navBar {{ background: {surface}; border: none; border-top: 1px solid {border}; }}
+QToolButton#navHome {{
+    background: transparent; color: {accent_text}; border: 2px solid {accent};
+    border-radius: 14px; padding: 1px 2px; font-size: 11px; font-weight: 600;
+}}
+QToolButton#navHome:hover {{ background: {hover}; }}
+QToolButton#navHome:checked {{ background: {accent_soft}; }}
+
+/* Titles and texts */
 QLabel#title {{ font-size: 18px; font-weight: 600; }}
 QLabel#subtitle, QLabel#muted {{ color: {muted}; }}
 QLabel#panelTitle {{ font-size: 15px; font-weight: 600; }}
 QLabel#accentLine {{ font-size: 15px; font-weight: 600; color: {accent_text}; }}
 
-/* Boutons */
+/* Buttons */
 QPushButton {{
     background: {accent_soft}; color: {accent_text}; border: none;
     border-radius: 8px; padding: 7px 12px; font-weight: 600;
@@ -71,14 +80,14 @@ QPushButton#flat {{ background: transparent; color: {pink_text}; padding: 4px 6p
 QPushButton#flat:hover {{ background: {pink_soft}; }}
 QPushButton:disabled {{ background: {surface}; color: {border_strong}; border-color: {border}; }}
 
-/* Panneaux (notes, règles, réglages) */
+/* Panels (notes, rules, settings) */
 QFrame#sidePanel, QFrame#overlay {{
     background: {surface}; border: 1px solid {border}; border-radius: 12px;
 }}
 QFrame#sidePanel QLabel, QFrame#sidePanel QCheckBox,
 QFrame#overlay QLabel, QFrame#overlay QCheckBox {{ background: transparent; }}
 
-/* Champs */
+/* Fields */
 QComboBox, QSpinBox, QLineEdit {{
     background: {input_bg}; border: 1px solid {border};
     border-radius: 8px; padding: 5px 8px; min-height: 22px;
@@ -86,8 +95,8 @@ QComboBox, QSpinBox, QLineEdit {{
 QSpinBox:hover, QSpinBox:focus,
 QLineEdit:hover, QLineEdit:focus {{ border-color: {accent}; }}
 
-/* Menus déroulants (touch_combo) : toute la case est le bouton, pas de flèche,
-   pas de surbrillance qui reste ; la liste s'ouvre au centre, sur un voile. */
+/* Drop-down menus (touch_combo): the whole box is the button, no arrow,
+   no lingering highlight; the list opens in the centre, over a veil. */
 QComboBox {{ padding: 5px 10px; }}
 QComboBox::drop-down {{ width: 0px; border: none; }}
 QComboBox::down-arrow {{ image: none; width: 0px; height: 0px; }}
@@ -119,8 +128,8 @@ QSlider::handle:horizontal {{
     width: 18px; height: 18px; margin: -8px 0; border-radius: 11px;
 }}
 
-/* Zones de défilement : le fond de la page passe au travers (sinon Android
-   peint la zone visible en blanc, même en thème sombre) */
+/* Scroll areas: the page background shows through (otherwise Android
+   paints the visible area white, even in the dark theme) */
 QScrollArea#strip, QScrollArea#plain {{ background: transparent; border: none; }}
 QScrollArea#strip > QWidget#qt_scrollarea_viewport,
 QScrollArea#plain > QWidget#qt_scrollarea_viewport {{ background: transparent; }}
@@ -133,7 +142,7 @@ QScrollBar::handle:horizontal {{ min-width: 30px; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
 QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 
-/* Gros bouton Lecture / Stop */
+/* Big Play / Stop button */
 QPushButton#primary, QPushButton#primaryStop {{
     font-size: 16px; padding: 10px 28px; border-radius: 10px;
 }}
@@ -158,19 +167,19 @@ THEMES = {
         pink_soft="#fdecf2", pink_text="#b4446b", pink_border="#f5c6d5",
         own_soft="#f1edfd", own_text="#6550c2", own_border="#d8cff7",
         gold="#d99a1e", gold_soft="#fdf3dc", flame="#f0743c", ice="#5aa9e6",
-        # Manche
+        # Neck
         board="#fbf8f9", board_border="#ece4e8", fret="#ddd5d9",
         nut="#c9c0c5", string="#b9b2b7", inlay="#f6d9e3",
-        # Pastilles : remplissage pastel, texte foncé
+        # Dots: pastel fill, dark text
         dots="pastel", dot_text="#2a2c33",
         degrees={
-            1: ("#f5a8bf", "#b8436a"),  # tonique : rose
-            3: ("#8fdcd1", "#1a7a70"),  # tierce : turquoise
-            5: ("#c8bbf3", "#6550c2"),  # quinte : lavande
-            7: ("#f8cba2", "#a85a14"),  # septième : pêche
-            2: ("#acd2f6", "#2c6db3"),  # seconde / 9 : bleu ciel
-            4: ("#c3e7b5", "#3d7f2f"),  # quarte / 11 : menthe
-            6: ("#f3e29a", "#86690a"),  # sixte / 13 : vanille
+            1: ("#f5a8bf", "#b8436a"),  # root: pink
+            3: ("#8fdcd1", "#1a7a70"),  # third: turquoise
+            5: ("#c8bbf3", "#6550c2"),  # fifth: lavender
+            7: ("#f8cba2", "#a85a14"),  # seventh: peach
+            2: ("#acd2f6", "#2c6db3"),  # second / 9: sky blue
+            4: ("#c3e7b5", "#3d7f2f"),  # fourth / 11: mint
+            6: ("#f3e29a", "#86690a"),  # sixth / 13: vanilla
         },
     ),
     "dark": dict(
@@ -183,38 +192,38 @@ THEMES = {
         pink_soft="#2a1220", pink_text="#ff5cb3", pink_border="#ff3ea5",
         own_soft="#1d1530", own_text="#b585ff", own_border="#a970ff",
         gold="#ffd23f", gold_soft="#2a2410", flame="#ff7a1a", ice="#5ac8ff",
-        # Manche
+        # Neck
         board="#121216", board_border="#24242b", fret="#30303a",
         nut="#4a4a55", string="#5c5c68", inlay="#24242c",
-        # Pastilles : contour et texte néon sur fond noir, avec halo
+        # Dots: neon outline and text on black, with a glow
         dots="neon", dot_text="#0a0a0c",
         degrees={
-            1: ("#ff3ea5", "#ff3ea5"),  # tonique : rose néon
-            3: ("#14f1d9", "#14f1d9"),  # tierce : turquoise néon
-            5: ("#a970ff", "#b585ff"),  # quinte : violet
-            7: ("#ff9f1a", "#ff9f1a"),  # septième : orange
-            2: ("#3d9bff", "#5aabff"),  # seconde / 9 : bleu
-            4: ("#a6ff3d", "#a6ff3d"),  # quarte / 11 : vert acide
-            6: ("#ffe347", "#ffe347"),  # sixte / 13 : jaune
+            1: ("#ff3ea5", "#ff3ea5"),  # root: neon pink
+            3: ("#14f1d9", "#14f1d9"),  # third: neon turquoise
+            5: ("#a970ff", "#b585ff"),  # fifth: violet
+            7: ("#ff9f1a", "#ff9f1a"),  # seventh: orange
+            2: ("#3d9bff", "#5aabff"),  # second / 9: blue
+            4: ("#a6ff3d", "#a6ff3d"),  # fourth / 11: acid green
+            6: ("#ffe347", "#ffe347"),  # sixth / 13: yellow
         },
     ),
 }
 
-# Anciens noms de thèmes (version française) -> nouveaux noms
+# Former theme names (French version) -> new names
 _ALIASES = {"clair": "light", "sombre": "dark"}
 
-SYSTEM = "system"          # réglage par défaut : le thème du téléphone
-_current = "light"         # thème affiché (jamais « system »)
-_choice = SYSTEM           # réglage choisi
+SYSTEM = "system"          # default setting: the phone's theme
+_current = "light"         # theme shown (never "system")
+_choice = SYSTEM           # chosen setting
 _style_applied = False
 _following = False
-_extra_qss: list[str] = []   # feuilles de style ajoutées par l'app (add_qss)
-_app = None                  # l'application, une fois le thème appliqué
+_extra_qss: list[str] = []   # style sheets added by the app (add_qss)
+_app = None                  # the application, once the theme is applied
 
 
 def add_qss(text: str) -> None:
-    """Ajoute une feuille de style de l'app (champs {couleur} du thème,
-    accolades doublées). Si le thème est déjà affiché, elle s'applique aussitôt."""
+    """Adds a style sheet of the app ({colour} fields of the theme,
+    doubled braces). If the theme is already shown, it applies at once."""
     if text and text not in _extra_qss:
         _extra_qss.append(text)
         if _app is not None:
@@ -222,19 +231,19 @@ def add_qss(text: str) -> None:
 
 
 def stylesheet(palette: dict) -> str:
-    """La feuille de style complète (socle + app) aux couleurs de `palette`."""
+    """The full style sheet (base + app) in the colours of `palette`."""
     return "".join(part.format(**palette) for part in [_BASE, *_extra_qss])
 
 
 def theme_choice(name) -> str:
-    """Le réglage : « system », « light » ou « dark » (inconnu : « system »)."""
+    """The setting: "system", "light" or "dark" (unknown: "system")."""
     name = _ALIASES.get(name, name)
     return name if name in THEMES or name == SYSTEM else SYSTEM
 
 
 def system_is_dark() -> bool:
-    """Le téléphone (ou l'ordinateur) est-il en mode sombre ? Qt 6.5 et plus ;
-    si on ne peut pas le savoir : clair."""
+    """Is the phone (or computer) in dark mode? Qt 6.5 and later;
+    if it cannot be known: light."""
     try:
         return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
     except (AttributeError, RuntimeError):
@@ -242,7 +251,7 @@ def system_is_dark() -> bool:
 
 
 def theme_name(name) -> str:
-    """Le thème à afficher pour ce réglage : « light » ou « dark »."""
+    """The theme shown for this setting: "light" or "dark"."""
     choice = theme_choice(name)
     if choice == SYSTEM:
         return "dark" if system_is_dark() else "light"
@@ -254,16 +263,16 @@ def current_palette() -> dict:
 
 
 def degree_colors(family: int) -> tuple[str, str]:
-    """(remplissage, encre) pour une famille de degré (1 à 7)."""
+    """(fill, ink) for a degree family (1 to 7)."""
     return THEMES[_current]["degrees"][family]
 
 
 def _qt_palette(c: dict) -> QPalette:
-    """Palette Qt aux couleurs du thème.
+    """Qt palette in the theme's colours.
 
-    La feuille de style ne couvre pas tout : sur Android, les zones qu'elle
-    oublie (intérieur des zones de défilement, listes déroulantes…) prennent
-    la palette du système, claire. Avec cette palette, tout suit le thème.
+    The style sheet does not cover everything: on Android, the areas it
+    misses (inside scroll areas, drop-down lists…) take the system
+    palette, which is light. With this palette, everything follows the theme.
     """
     role = QPalette.ColorRole
     colors = {
@@ -286,14 +295,14 @@ def _qt_palette(c: dict) -> QPalette:
 
 
 def apply_theme(app: QApplication, name: object) -> None:
-    """Applique le réglage `name` (« system », « light » ou « dark »)."""
+    """Applies the setting `name` ("system", "light" or "dark")."""
     global _current, _choice, _app
     _app = app
     _choice = theme_choice(name)
     _current = theme_name(_choice)
     palette = {k: v for k, v in THEMES[_current].items() if isinstance(v, str)}
-    # « Fusion » : le même dessin des contrôles sur Android, Windows et Linux
-    # (le style natif d'Android ignore une partie des couleurs du thème).
+    # "Fusion": the same drawing of controls on Android, Windows and Linux
+    # (Android's native style ignores some of the theme's colours).
     global _style_applied
     if not _style_applied:
         app.setStyle("Fusion")
@@ -303,15 +312,15 @@ def apply_theme(app: QApplication, name: object) -> None:
 
 
 def follow_system(app: QApplication, on_change=None) -> None:
-    """Quand le téléphone passe en sombre ou en clair pendant que l'app est
-    ouverte, l'app suit (si le réglage est « system »). `on_change` est appelé
-    après coup, pour redessiner ce qui est peint à la main (manche…)."""
+    """When the phone switches to dark or light while the app is
+    open, the app follows (if the setting is "system"). `on_change` is called
+    afterwards, to redraw what is painted by hand (neck…)."""
     global _following
     if _following:
         return
     try:
         signal = QGuiApplication.styleHints().colorSchemeChanged
-    except AttributeError:   # Qt trop ancien : le thème suit au prochain lancement
+    except AttributeError:   # Qt too old: the theme follows at the next start
         return
     _following = True
 
@@ -322,5 +331,5 @@ def follow_system(app: QApplication, on_change=None) -> None:
         if on_change is not None:
             on_change()
 
-    # après Qt, qui met aussi à jour ses propres couleurs à ce moment-là
+    # after Qt, which also updates its own colours at that moment
     signal.connect(lambda *_: QTimer.singleShot(0, refresh))

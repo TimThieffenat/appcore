@@ -1,12 +1,12 @@
-"""appcore : le socle commun des apps (PySide6, téléphone en paysage + ordinateur).
+"""appcore: the shared base of the apps (PySide6, phone in landscape or portrait + desktop).
 
-Démarrage, fenêtre à rail d'icônes, réglages, thèmes, traductions, rapport
-d'erreur, son (guitares enregistrées, clavier), contrôles tactiles, police de
-symboles, et toute la compilation Android (android/). Chaque app l'inclut
-comme sous-module git dans son dossier `appcore/` et n'écrit que ce qui lui
-est propre (voir README.md).
+Start-up, window with an icon rail, settings, themes, translations, error
+report, sound (recorded guitars, keyboard), touch controls, symbols font, and
+the whole Android build (android/). Each app includes it as a git submodule
+in its `appcore/` folder and only writes what is its own
+(see README.md).
 
-Ce fichier n'importe rien : `from appcore import app` marche sans Qt (outils, tests).
+This file imports nothing: `from appcore import app` works without Qt (tools, tests).
 """
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"

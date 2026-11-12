@@ -1,22 +1,22 @@
-"""Textes à traduire (socle et app), et ce qu'il manque dans chaque langue.
+"""Texts to translate (base and app), and what is missing in each language.
 
-Outil de développement, pas utilisé par l'app. Depuis le dossier de l'app :
+Development tool, not used by the app. From the app's folder:
 
-    python appcore/tools/i18n_check.py            # bilan de chaque langue de l'app
-    python appcore/tools/i18n_check.py --list     # tous les textes de l'app, par fichier
-    python appcore/tools/i18n_check.py --core     # bilan du socle seul (appcore/locales)
+    python appcore/tools/i18n_check.py            # summary of each of the app's languages
+    python appcore/tools/i18n_check.py --list     # all the app's texts, by file
+    python appcore/tools/i18n_check.py --core     # summary of the base alone (appcore/locales)
 
-Les textes à traduire sont :
-- ceux écrits dans tr(...), ntr(...) et N_(...) dans le code ;
-- les noms des tableaux de données (gammes, accords, accordages, instruments…
-  pour le socle ; ceux de l'app sont donnés par tools/i18n_data.py de l'app,
-  une fonction texts(add)), lus directement dans les modules, sans avoir à les
-  marquer un par un.
+The texts to translate are:
+- those written in tr(...), ntr(...) and N_(...) in the code;
+- the names in data tables (scales, chords, tunings, instruments…
+  for the base; the app's are given by the app's tools/i18n_data.py,
+  a texts(add) function), read directly from the modules, without having to
+  mark them one by one.
 
-Les textes du socle se traduisent dans appcore/locales/<code>.py, ceux de
-l'app dans locales/<code>.py. Pour chaque langue, le bilan donne les textes
-manquants (affichés en anglais dans l'app), ceux qui ne servent plus, et les
-traductions dont les champs {nom} ne correspondent pas à l'anglais.
+The base's texts are translated in appcore/locales/<code>.py, the
+app's in locales/<code>.py. For each language, the summary gives the missing
+texts (shown in English in the app), those no longer used, and the
+translations whose {name} fields do not match the English.
 """
 
 from __future__ import annotations
@@ -30,16 +30,16 @@ from pathlib import Path
 
 CORE = Path(__file__).resolve().parent.parent          # appcore/
 CORE_ONLY = "--core" in sys.argv
-ROOT = CORE.parent if CORE_ONLY else Path.cwd()        # le dossier de l'app
+ROOT = CORE.parent if CORE_ONLY else Path.cwd()        # the app's folder
 sys.path.insert(0, str(ROOT))
 SKIP = {"symbol_font_data.py"}
 CALLS = ("tr", "N_", "ntr")
 
-Texts = dict[str, tuple[str, str | None]]   # texte -> (source, pluriel ou None)
+Texts = dict[str, tuple[str, str | None]]   # text -> (source, plural or None)
 
 
 def code_texts(folder: Path, prefix: str = "") -> Texts:
-    """tr / ntr / N_ dans les fichiers .py d'un dossier (sans les sous-dossiers)."""
+    """tr / ntr / N_ in the .py files of a folder (without subfolders)."""
     found: Texts = {}
     for path in sorted(folder.glob("*.py")):
         if path.name in SKIP:
@@ -74,7 +74,7 @@ def _adder(out: Texts):
 
 
 def core_data_texts() -> Texts:
-    """Noms des tableaux du socle."""
+    """Names in the base's tables."""
     from appcore import guitar_synth
     from appcore import music_theory as mt
 
@@ -89,7 +89,7 @@ def core_data_texts() -> Texts:
 
 
 def app_data_texts() -> Texts:
-    """Noms des tableaux de l'app : tools/i18n_data.py de l'app, fonction texts(add)."""
+    """Names in the app's tables: the app's tools/i18n_data.py, texts(add) function."""
     path = ROOT / "tools" / "i18n_data.py"
     out: Texts = {}
     if not path.is_file():
@@ -140,28 +140,28 @@ def check(catalog: dict, texts: Texts, extra_used=()) -> tuple[list, list, list]
             expected = _fields(text) | _fields(plural)
             for form in value:
                 if _fields(form) - expected or not _fields(form) >= (_fields(text) - {"n"}):
-                    wrong.append((text, f"champs {sorted(_fields(form))} ≠ {sorted(expected)}"))
+                    wrong.append((text, f"fields {sorted(_fields(form))} ≠ {sorted(expected)}"))
         elif isinstance(value, tuple):
-            wrong.append((text, "pas un pluriel"))
+            wrong.append((text, "not a plural"))
         elif _fields(value) != _fields(text):
-            wrong.append((text, f"champs {sorted(_fields(value))} ≠ {sorted(_fields(text))}"))
+            wrong.append((text, f"fields {sorted(_fields(value))} ≠ {sorted(_fields(text))}"))
     return missing, unused, wrong
 
 
 def _report(label: str, total: int, missing, unused, wrong) -> bool:
-    print(f"{label} : {total - len(missing)}/{total} traduits"
-          + (f", {len(unused)} inutiles" if unused else "")
-          + (f", {len(wrong)} à corriger" if wrong else ""))
+    print(f"{label}: {total - len(missing)}/{total} translated"
+          + (f", {len(unused)} unused" if unused else "")
+          + (f", {len(wrong)} to fix" if wrong else ""))
     for text in missing[:15]:
-        print(f"   manque : {text!r}")
+        print(f"   missing: {text!r}")
     if len(missing) > 15:
-        print(f"   … et {len(missing) - 15} autres")
+        print(f"   … and {len(missing) - 15} more")
     for text in unused[:5]:
-        print(f"   inutile : {text!r}")
+        print(f"   unused: {text!r}")
     if len(unused) > 5:
-        print(f"   … et {len(unused) - 5} autres inutiles")
+        print(f"   … and {len(unused) - 5} more unused")
     for text, why in wrong:
-        print(f"   ! {text!r} : {why}")
+        print(f"   ! {text!r}: {why}")
     return bool(missing or wrong)
 
 
@@ -182,11 +182,11 @@ def main() -> None:
     status = 0
     codes = [c for c in i18n.ALL_LANGUAGES if c != "en"] if CORE_ONLY else \
         [c for c in i18n.LANGUAGES if c != "en"]
-    print(f"Socle : {len(core)} textes")
+    print(f"Base: {len(core)} texts")
     for code in codes:
         catalog = _catalog(f"appcore.locales.{code}")
         if catalog is None:
-            print(f"  {code} : pas de fichier appcore/locales/{code}.py")
+            print(f"  {code}: no appcore/locales/{code}.py file")
             status = 1
             continue
         status |= _report(f"  {code}", len(core), *check(catalog, core))
@@ -195,14 +195,14 @@ def main() -> None:
 
     import app_info
     own = {t: v for t, v in app_texts().items() if t not in core}
-    print(f"{app_info.NAME} : {len(own)} textes (en plus de ceux du socle)")
+    print(f"{app_info.NAME}: {len(own)} texts (on top of the base's)")
     for code in codes:
         catalog = _catalog(f"locales.{code}")
         if catalog is None:
-            print(f"  {code} : pas de fichier locales/{code}.py")
+            print(f"  {code}: no locales/{code}.py file")
             status = 1
             continue
-        # une entrée de l'app peut remplacer celle du socle (autre traduction) : utile
+        # an app entry may replace the base's one (different translation): useful
         status |= _report(f"  {code}", len(own), *check(catalog, own, extra_used=core))
     sys.exit(status)
 

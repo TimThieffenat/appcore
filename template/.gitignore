@@ -5,7 +5,7 @@ dist/
 .buildozer/
 .venv/
 
-# Clés de signature : ne jamais publier
+# Signing keys: never publish them
 *.jks
 *.keystore
 *.aab

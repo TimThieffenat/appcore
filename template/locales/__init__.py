@@ -1,1 +1,1 @@
-"""Traductions de l'app : un fichier par langue (voir appcore/i18n.py)."""
+"""The app's translations: one file per language (see appcore/i18n.py)."""

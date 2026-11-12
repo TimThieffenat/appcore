@@ -1,46 +1,46 @@
 #!/usr/bin/env bash
 #
-# Compile l'application en APK Android (arm64) avec pyside6-android-deploy.
+# Builds the application as an Android APK (arm64) with pyside6-android-deploy.
 #
-# À lancer sous Linux : Ubuntu 24.04 dans WSL2 sur Windows, ou GitHub Actions,
-# depuis le dossier de l'app (celui de main.py et app_info.py) :
+# Run on Linux: Ubuntu 24.04 in WSL2 on Windows, or GitHub Actions,
+# from the app's folder (the one holding main.py and app_info.py):
 #
 #   bash appcore/android/build_apk.sh
 #
-# Relançable sans risque : tout ce qui est déjà téléchargé est réutilisé.
-# Tout ce qui est propre à l'app (nom, paquet, autorisations, dossiers à
-# embarquer…) vient de son app_info.py (voir android/app_config.py).
+# Safe to run again: everything already downloaded is reused.
+# Everything specific to the app (name, package, permissions, folders to
+# bundle…) comes from its app_info.py (see android/app_config.py).
 #
-# Versions figées (celles de l'outil de Qt, voir ANDROID.md) :
+# Pinned versions (those of Qt's tool, see ANDROID.md):
 # PySide6 6.12.0 · buildozer 1.6.0 · cython 0.29.33 · NDK r28c · JDK 17
-# Python 3.11 pour l'outil (sur le PC) ; Python 3.14 dans l'app (choisi par
-# l'outil de Qt via python-for-android v2026.05.09).
-# NDK r28c : tout ce que python-for-android compile (Python, ssl, crypto,
-# sqlite, libffi, le lanceur) est aligné sur les pages de 16 Ko (Android 15+,
-# exigé par Google Play) ; les bibliothèques Qt de PySide6 6.12 le sont aussi.
-# android/check_16k.py le vérifie à la fin.
-# PYSIDE_VERSION=6.11.2 reprend l'ancienne combinaison (buildozer 1.5.0, NDK
-# r27c, Python 3.11 dans l'app), sans les pages de 16 Ko.
-# Android visé : API 36 (variable APPCORE_ANDROID_API pour en changer).
-# Android minimum : API 28 = Android 9, le minimum de Qt 6.8+ (APPCORE_ANDROID_MINAPI).
+# Python 3.11 for the tool (on the PC); Python 3.14 in the app (chosen by
+# Qt's tool through python-for-android v2026.05.09).
+# NDK r28c: everything python-for-android builds (Python, ssl, crypto,
+# sqlite, libffi, the launcher) is aligned on 16 KB pages (Android 15+,
+# required by Google Play); PySide6 6.12's Qt libraries are too.
+# android/check_16k.py checks it at the end.
+# PYSIDE_VERSION=6.11.2 brings back the old combination (buildozer 1.5.0, NDK
+# r27c, Python 3.11 in the app), without 16 KB pages.
+# Target Android: API 36 (APPCORE_ANDROID_API variable to change it).
+# Minimum Android: API 28 = Android 9, Qt 6.8+'s minimum (APPCORE_ANDROID_MINAPI).
 #
-# --keep-deployment-files garde buildozer.spec et le dossier deployment/ :
-# android/release_aab.sh en a besoin pour fabriquer l'AAB de Google Play.
+# --keep-deployment-files keeps buildozer.spec and the deployment/ folder:
+# android/release_aab.sh needs them to make the Google Play AAB.
 #
 set -euo pipefail
 
 PYSIDE_VERSION=${PYSIDE_VERSION:-6.12.0}
-CORE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)    # le socle (appcore/)
-ROOT=${APP_ROOT:-$(cd "$CORE/.." && pwd)}                # le dossier de l'app
-[ -f "$ROOT/app_info.py" ] || { echo "app_info.py introuvable dans $ROOT" >&2; exit 1; }
-# Nom, paquet, autorisations… de l'app (app_info.py) ; le nom doit être un
-# identifiant Java valide (c'est le nom de l'APK)
+CORE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)    # the base (appcore/)
+ROOT=${APP_ROOT:-$(cd "$CORE/.." && pwd)}                # the app's folder
+[ -f "$ROOT/app_info.py" ] || { echo "app_info.py not found in $ROOT" >&2; exit 1; }
+# The app's name, package, permissions… (app_info.py); the name must be a
+# valid Java identifier (it is the APK's name)
 CONFIG=$(python3 "$CORE/android/app_config.py" "$ROOT") || exit 1
 eval "$CONFIG"
-ANDROID_ARCH=${ANDROID_ARCH:-aarch64}    # aarch64 = téléphones récents (arm64-v8a)
+ANDROID_ARCH=${ANDROID_ARCH:-aarch64}    # aarch64 = recent phones (arm64-v8a)
 case "$PYSIDE_VERSION" in
     6.11.*) DEFAULT_NDK=r27c; BUILDOZER_VERSION=1.5.0 ;;
-    *)      DEFAULT_NDK=r28c; BUILDOZER_VERSION=1.6.0 ;;   # versions de l'outil de Qt 6.12
+    *)      DEFAULT_NDK=r28c; BUILDOZER_VERSION=1.6.0 ;;   # versions of Qt 6.12's tool
 esac
 NDK_VERSION=${NDK_VERSION:-$DEFAULT_NDK}
 ANT_VERSION=${ANT_VERSION:-1.9.4}
@@ -61,33 +61,33 @@ ANT_DIR=$PLATFORM/apache-ant-$ANT_VERSION
 QT_DOWNLOADS=https://download.qt.io/official_releases/QtForPython
 
 step() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
-fail() { printf '\n\033[1;31mERREUR : %s\033[0m\n' "$*" >&2; exit 1; }
+fail() { printf '\n\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
-step "1/8 Vérification des outils système"
+step "1/8 Checking system tools"
 # ---------------------------------------------------------------------------
-[ "$(uname -s)" = "Linux" ] || fail "à lancer sous Linux (Ubuntu dans WSL2 sur Windows)."
+[ "$(uname -s)" = "Linux" ] || fail "run on Linux (Ubuntu in WSL2 on Windows)."
 PACKAGES=(autoconf automake libtool libltdl-dev pkg-config openjdk-17-jdk zip unzip ccache curl git)
-# libltdl-dev fournit la macro LT_SYS_SYMBOL_USCORE, dont libffi a besoin
-# (sans elle : « possibly undefined macro: LT_SYS_SYMBOL_USCORE »).
+# libltdl-dev provides the LT_SYS_SYMBOL_USCORE macro, which libffi needs
+# (without it: "possibly undefined macro: LT_SYS_SYMBOL_USCORE").
 missing=()
 for pkg in "${PACKAGES[@]}"; do
     dpkg -s "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
 done
 if [ ${#missing[@]} -gt 0 ] && [ -n "${CI:-}" ]; then
-    # Sur GitHub Actions : on installe nous-mêmes ce qui manque.
+    # On GitHub Actions: install what is missing ourselves.
     sudo apt-get update -qq
     sudo apt-get install -y "${missing[@]}"
     missing=()
 fi
-[ ${#missing[@]} -eq 0 ] || fail "paquets manquants. Installe-les avec :
+[ ${#missing[@]} -eq 0 ] || fail "missing packages. Install them with:
     sudo apt-get update && sudo apt-get install -y ${missing[*]}"
 
 export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}
-[ -x "$JAVA_HOME/bin/javac" ] || fail "JDK 17 introuvable dans $JAVA_HOME"
+[ -x "$JAVA_HOME/bin/javac" ] || fail "JDK 17 not found in $JAVA_HOME"
 export PATH="$JAVA_HOME/bin:$PATH"
 
-# Proxy éventuel : Java ne lit pas http(s)_proxy, on le donne à Gradle.
+# Possible proxy: Java does not read http(s)_proxy, give it to Gradle.
 PROXY=${https_proxy:-${http_proxy:-}}
 if [ -n "$PROXY" ]; then
     host=$(printf '%s' "$PROXY" | sed -E 's#^[a-z]+://##; s#/.*$##; s#:.*$##')
@@ -104,17 +104,17 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-step "2/8 Environnement Python 3.11 (pour l'outil de compilation)"
+step "2/8 Python 3.11 environment (for the build tool)"
 # ---------------------------------------------------------------------------
 mkdir -p "$BUILD"
-# Un venv corrigé par les anciens scripts de l'app (avant le socle : étiquettes
-# THECORDS-PATCH, PERFECTPITCH-PATCH…) ne peut pas recevoir les correctifs du
-# socle : on le refait (rien d'autre n'est retéléchargé que les paquets Python).
+# A venv patched by the app's old scripts (before the base: tags
+# THECORDS-PATCH, PERFECTPITCH-PATCH…) cannot receive the base's fixes:
+# it is rebuilt (only the Python packages are downloaded again).
 if [ -d "$VENV" ] && grep -rqsE "(THECORDS|PERFECTPITCH|[A-Z]+)-PATCH" \
         "$VENV"/lib/python3.11/site-packages/PySide6/scripts/deploy_lib/android/buildozer.py \
         && ! grep -qs "APPCORE-PATCH" \
         "$VENV"/lib/python3.11/site-packages/PySide6/scripts/deploy_lib/android/buildozer.py; then
-    echo "Ancien environnement de compilation (d'avant appcore) : il est refait."
+    echo "Old build environment (from before appcore): rebuilding it."
     rm -rf "$VENV"
 fi
 if [ ! -x "$PY" ]; then
@@ -123,25 +123,25 @@ if [ ! -x "$PY" ]; then
     elif command -v python3.11 >/dev/null; then
         python3.11 -m venv "$VENV"
     else
-        fail "Python 3.11 introuvable. Le plus simple : installer uv
-    curl -LsSf https://astral.sh/uv/install.sh | sh   (puis rouvrir le terminal)"
+        fail "Python 3.11 not found. The simplest: install uv
+    curl -LsSf https://astral.sh/uv/install.sh | sh   (then reopen the terminal)"
     fi
 fi
-"$PY" -c 'import sys; assert sys.version_info[:2] == (3, 11)' || fail "le venv n'est pas en Python 3.11"
-# buildozer fait « pip install --user » : il faut voir les paquets utilisateur.
+"$PY" -c 'import sys; assert sys.version_info[:2] == (3, 11)' || fail "the venv is not Python 3.11"
+# buildozer runs "pip install --user": user packages must be visible.
 sed -i 's/^include-system-site-packages *=.*/include-system-site-packages = true/' "$VENV/pyvenv.cfg"
 
 install() {
     if command -v uv >/dev/null; then uv pip install --python "$PY" -q "$@"
     else "$PY" -m pip install -q "$@"; fi
 }
-# Versions EXACTES : sinon l'outil réinstalle buildozer et annule les correctifs.
+# EXACT versions: otherwise the tool reinstalls buildozer and undoes the fixes.
 install pip "pyside6==$PYSIDE_VERSION" "buildozer==$BUILDOZER_VERSION" "cython==$CYTHON_VERSION"
 REQS=$("$PY" -c "import PySide6, pathlib; print(pathlib.Path(PySide6.__file__).parent / 'scripts' / 'requirements-android.txt')")
 [ -f "$REQS" ] && install -r "$REQS"
 
 # ---------------------------------------------------------------------------
-step "3/8 Correctifs de l'outil de déploiement"
+step "3/8 Fixing the deployment tool"
 # ---------------------------------------------------------------------------
 SITE=$("$PY" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
 "$PY" "$CORE/android/patch_deploy_tools.py" "$SITE"
@@ -149,9 +149,9 @@ SITE=$("$PY" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
 # ---------------------------------------------------------------------------
 step "4/8 Wheels Android de PySide6 ($ANDROID_ARCH)"
 # ---------------------------------------------------------------------------
-# Nom des wheels : « cp310-abi3 » depuis 6.12 (valables pour tout Python
-# >= 3.10), « cp311-cp311 » avant.
-wheel() {   # wheel pyside6|shiboken6 : télécharge si besoin, affiche le chemin
+# Wheel names: "cp310-abi3" since 6.12 (valid for any Python
+# >= 3.10), "cp311-cp311" before.
+wheel() {   # wheel pyside6|shiboken6: downloads if needed, prints the path
     local tag file
     for tag in cp310-abi3 cp311-cp311; do
         file=$BUILD/$1-$PYSIDE_VERSION-$PYSIDE_VERSION-$tag-android_$ANDROID_ARCH.whl
@@ -162,14 +162,14 @@ wheel() {   # wheel pyside6|shiboken6 : télécharge si besoin, affiche le chemi
     done
     return 1
 }
-WHEEL_PYSIDE=$(wheel pyside6) || fail "wheel Android pyside6 $PYSIDE_VERSION introuvable sur $QT_DOWNLOADS"
-WHEEL_SHIBOKEN=$(wheel shiboken6) || fail "wheel Android shiboken6 $PYSIDE_VERSION introuvable sur $QT_DOWNLOADS"
+WHEEL_PYSIDE=$(wheel pyside6) || fail "Android wheel pyside6 $PYSIDE_VERSION not found on $QT_DOWNLOADS"
+WHEEL_SHIBOKEN=$(wheel shiboken6) || fail "Android wheel shiboken6 $PYSIDE_VERSION not found on $QT_DOWNLOADS"
 echo "$(basename "$WHEEL_PYSIDE")"; echo "$(basename "$WHEEL_SHIBOKEN")"
 
 # ---------------------------------------------------------------------------
 step "5/8 Android NDK $NDK_VERSION"
 # ---------------------------------------------------------------------------
-# L'outil ne sait pas télécharger le NDK lui-même (bug connu) : on le fait ici.
+# The tool cannot download the NDK itself (known bug): do it here.
 if [ ! -d "$NDK_DIR" ]; then
     mkdir -p "$CACHE/android-ndk"
     curl -sSL --fail -o "$CACHE/android-ndk/ndk.zip" \
@@ -179,7 +179,7 @@ if [ ! -d "$NDK_DIR" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-step "6/8 Apache Ant et Android SDK"
+step "6/8 Apache Ant and Android SDK"
 # ---------------------------------------------------------------------------
 if [ ! -d "$ANT_DIR" ]; then
     mkdir -p "$PLATFORM"
@@ -189,8 +189,8 @@ if [ ! -d "$ANT_DIR" ]; then
     rm -f "$PLATFORM/ant.tar.gz"
 fi
 if [ ! -x "$SDK_DIR/tools/bin/sdkmanager" ]; then
-    # décompression dans un dossier temporaire : un téléchargement raté ne
-    # doit pas laisser un SDK à moitié installé
+    # unpacked in a temporary folder: a failed download must not
+    # leave a half-installed SDK
     rm -rf "$SDK_DIR" "$SDK_DIR.tmp"
     mkdir -p "$SDK_DIR.tmp"
     curl -sSL --fail -o "$SDK_DIR.tmp/tools.zip" "https://dl.google.com/android/repository/$CMDLINE_TOOLS"
@@ -199,28 +199,28 @@ if [ ! -x "$SDK_DIR/tools/bin/sdkmanager" ]; then
     mv "$SDK_DIR.tmp" "$SDK_DIR"
 fi
 if [ ! -d "$SDK_DIR/platform-tools" ]; then
-    # « yes | commande » + pipefail : yes reçoit « Broken pipe » dès que
-    # sdkmanager a fini de lire, et le pipeline est alors compté en échec même
-    # si l'installation a réussi. On coupe pipefail ici : le statut du
-    # pipeline devient celui de sdkmanager, ce qui est bien ce qu'on veut.
+    # "yes | command" + pipefail: yes gets "Broken pipe" as soon as
+    # sdkmanager has finished reading, and the pipeline then counts as failed
+    # even if the installation succeeded. pipefail is turned off here: the
+    # pipeline's status becomes sdkmanager's, which is what we want.
     set +o pipefail
     yes | "$SDK_DIR/tools/bin/sdkmanager" --sdk_root="$SDK_DIR" "${SDK_PROXY[@]}" --licenses >/dev/null || true
     yes | "$SDK_DIR/tools/bin/sdkmanager" --sdk_root="$SDK_DIR" "${SDK_PROXY[@]}" platform-tools >/dev/null || true
     set -o pipefail
 fi
-[ -d "$SDK_DIR/platform-tools" ] || fail "sdkmanager n'a pas installé platform-tools (voir les messages ci-dessus)"
+[ -d "$SDK_DIR/platform-tools" ] || fail "sdkmanager did not install platform-tools (see the messages above)"
 
 # ---------------------------------------------------------------------------
-step "7/8 Copie de l'application"
+step "7/8 Copying the application"
 # ---------------------------------------------------------------------------
 rm -rf "$APP"
 mkdir -p "$APP/appcore"
 cp "$ROOT"/*.py "$APP"/
-# Le socle : son code, ses traductions et les guitares enregistrées (pas ses
-# outils, tests, modèles ni scripts de compilation)
+# The base: its code, translations and recorded guitars (not its
+# tools, tests, templates or build scripts)
 cp "$CORE"/*.py "$APP/appcore/"
 cp -r "$CORE/locales" "$CORE/sounds" "$APP/appcore/"
-# Les dossiers de l'app : traductions, sons, et ceux de EXTRA_DIRS (app_info.py)
+# The app's folders: translations, sounds, and those of EXTRA_DIRS (app_info.py)
 for dir in locales sounds $APP_EXTRA_DIRS; do
     if [ -d "$ROOT/$dir" ]; then
         mkdir -p "$APP/$(dirname "$dir")"
@@ -231,15 +231,15 @@ find "$APP" -name "__pycache__" -prune -exec rm -rf {} +
 find "$APP/appcore/sounds" -type f ! -name "*.snd" -delete
 [ -d "$APP/sounds" ] && find "$APP/sounds" -type f ! -name "*.snd" -delete
 [ -f "$ROOT/icon.png" ] && cp "$ROOT/icon.png" "$APP"/
-rm -f "$APP/pysidedeploy.spec"   # un ancien fichier empêche de trouver le NDK
-echo "$APP_NAME $APP_VERSION · paquet $APP_PACKAGE · autorisations : $APP_PERMISSIONS"
-# Partie Java (écran toujours allumé, causes des arrêts pour le rapport
-# d'erreur, résultat du sélecteur de fichiers transmis à Qt) : modèles du
-# socle, au nom du paquet Java de l'app, plus le Java de l'app elle-même
-# (son android/java/ : achat dans l'app, notifications… et ses crochets
-# AppHooks.java). Hors du dossier de l'app, pour ne pas la copier dans les
-# fichiers Python de l'APK. Les bibliothèques Java de l'app (GRADLE_DEPENDENCIES)
-# sont ajoutées par Gradle : voir le correctif « gradle-deps » de patch_deploy_tools.py
+rm -f "$APP/pysidedeploy.spec"   # an old file prevents finding the NDK
+echo "$APP_NAME $APP_VERSION · package $APP_PACKAGE · permissions: $APP_PERMISSIONS"
+# Java part (screen always on, exit reasons for the error
+# report, file picker result passed to Qt): the base's
+# templates, in the app's Java package, plus the app's own Java
+# (its android/java/: in-app purchase, notifications… and its
+# AppHooks.java hooks). Outside the app's folder, so it is not copied into the
+# APK's Python files. The app's Java libraries (GRADLE_DEPENDENCIES)
+# are added by Gradle: see the "gradle-deps" fix of patch_deploy_tools.py
 rm -rf "$BUILD/java"
 JAVA_DIR="$BUILD/java/$(echo "$JAVA_PACKAGE" | tr . /)"
 mkdir -p "$JAVA_DIR"
@@ -249,7 +249,7 @@ fi
 for template in "$CORE"/android/java/*.java.in; do
     target="$JAVA_DIR/$(basename "$template" .in)"
     if [ -f "$target" ]; then
-        echo "Java : $(basename "$target") de l'app (à la place du modèle du socle)"
+        echo "Java: the app's $(basename "$target") (instead of the base's template)"
         continue
     fi
     sed -e "s/@JAVA_PACKAGE@/$JAVA_PACKAGE/g" -e "s/@APP_NAME@/$APP_NAME/g" \
@@ -258,28 +258,29 @@ done
 export APPCORE_JAVA_SRC="$BUILD/java"
 export APPCORE_ENTRYPOINT="$JAVA_PACKAGE.KeepAwakeActivity"
 export APPCORE_PERMISSIONS="$APP_PERMISSIONS"
+export APPCORE_ORIENTATION="$APP_ORIENTATION"     # portrait or landscape (app_info.ORIENTATION)
 export APPCORE_GRADLE_DEPS="${APPCORE_GRADLE_DEPS-$APP_GRADLE_DEPS}"
 export APPCORE_EXPECTED_PERMISSIONS="$APP_LIBRARY_PERMISSIONS"
 [ -f "$APP/icon.png" ] && export APPCORE_ICON="$APP/icon.png"
-# Correctif appelé par python-for-android juste avant Gradle : sans lui, la
-# version Google Play se ferme au démarrage (voir android/p4a_hook.py)
+# Fix called by python-for-android right before Gradle: without it, the
+# Google Play version closes at start-up (see android/p4a_hook.py)
 cp "$CORE/android/p4a_hook.py" "$BUILD/p4a_hook.py"
 export APPCORE_P4A_HOOK="$BUILD/p4a_hook.py"
-# Retire les bibliothèques Qt et modules PySide6 inutilisés (3D, Charts, QML…) :
-# environ 300 Mo de moins une fois installée (voir android/slim_bundle.py).
-# APPCORE_SLIM= (vide) pour tout garder.
+# Removes unused Qt libraries and PySide6 modules (3D, Charts, QML…):
+# about 300 MB less once installed (see android/slim_bundle.py).
+# APPCORE_SLIM= (empty) to keep everything.
 cp "$CORE/android/slim_bundle.py" "$BUILD/slim_bundle.py"
 export APPCORE_SLIM=${APPCORE_SLIM-$BUILD/slim_bundle.py}
 
 # ---------------------------------------------------------------------------
-step "8/8 Compilation de l'APK (20 à 40 min la première fois)"
+step "8/8 Building the APK (20 to 40 min the first time)"
 # ---------------------------------------------------------------------------
 cd "$APP"
 
-# Gradle télécharge ses bibliothèques sur Maven Central / Google. Un raté réseau
-# passager donne « Could not find … » sur des fichiers qui existent : on laisse
-# plus de temps aux téléchargements et on retente la compilation (ce qui est
-# déjà téléchargé est réutilisé, donc les essais suivants sont plus rapides).
+# Gradle downloads its libraries from Maven Central / Google. A passing network
+# failure gives "Could not find …" on files that exist: give downloads
+# more time and retry the build (what is already
+# downloaded is reused, so later attempts are faster).
 mkdir -p "$HOME/.gradle"
 for prop in 'systemProp.org.gradle.internal.http.connectionTimeout=60000' \
             'systemProp.org.gradle.internal.http.socketTimeout=60000' \
@@ -301,10 +302,10 @@ for attempt in 1 2 3; do
         break
     fi
     [ "$attempt" -lt 3 ] || break
-    printf '\n\033[1;33mCompilation échouée (essai %s/3). Nouvel essai dans 30 s…\033[0m\n' "$attempt" >&2
+    printf '\n\033[1;33mBuild failed (attempt %s/3). Retrying in 30 s…\033[0m\n' "$attempt" >&2
     sleep 30
 done
-[ $built -eq 1 ] || fail "la compilation a échoué 3 fois (voir les messages ci-dessus)"
+[ $built -eq 1 ] || fail "the build failed 3 times (see the messages above)"
 
 mkdir -p "$DIST"
 BUILT=()
@@ -313,16 +314,16 @@ for apk in "$APP"/*.apk "$APP"/bin/*.apk; do
     cp "$apk" "$DIST/"
     BUILT+=("$DIST/$(basename "$apk")")
 done
-[ ${#BUILT[@]} -gt 0 ] || fail "aucun APK produit (voir les messages ci-dessus)"
-step "APK prêt :"
+[ ${#BUILT[@]} -gt 0 ] || fail "no APK produced (see the messages above)"
+step "APK ready:"
 ls -lh "${BUILT[@]}"
-# Autorisations déclarées (seulement celles de ANDROID_PERMISSIONS attendues)
+# Declared permissions (only those of ANDROID_PERMISSIONS expected)
 "$PY" "$CORE/android/apk_permissions.py" "${BUILT[@]}" || true
-# Pages de 16 Ko (Android 15+, Google Play) : toutes les bibliothèques doivent
-# être alignées sur 16 Ko
+# 16 KB pages (Android 15+, Google Play): all libraries must be
+# aligned on 16 KB
 "$PY" "$CORE/android/check_16k.py" "${BUILT[@]}" \
-    || printf '\n\033[1;33mAttention : APK pas entièrement compatible 16 Ko (voir ci-dessus).\033[0m\n' >&2
-# Toutes les bibliothèques que Qt charge au démarrage doivent être dans l'APK :
-# sinon l'app se ferme dès son lancement (vu avec la 1re version PySide6 6.12)
+    || printf '\n\033[1;33mWarning: APK not fully 16 KB compatible (see above).\033[0m\n' >&2
+# All the libraries Qt loads at start-up must be in the APK:
+# otherwise the app closes right at start-up (seen with the first PySide6 6.12 version)
 "$PY" "$CORE/android/check_qt_libs.py" "${BUILT[@]}" \
-    || fail "l'APK se fermerait au démarrage : bibliothèques de Qt manquantes (voir ci-dessus)"
+    || fail "the APK would close at start-up: Qt libraries missing (see above)"

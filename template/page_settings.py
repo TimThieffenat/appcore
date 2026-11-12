@@ -1,5 +1,5 @@
-"""Page « Settings » : celle du socle (langue, thème, noms des notes,
-instrument, rapport d'erreur). Pour ajouter un réglage, redéfinir rows() :
+"""The "Settings" page: the base's one (language, theme, note names,
+instrument, error report). To add a setting, override rows():
 
     def rows(self):
         self.speed_box = ui.combo(chars=18, min_width=200)
@@ -9,8 +9,8 @@ instrument, rapport d'erreur). Pour ajouter un réglage, redéfinir rows() :
         return [self.language_row(), self.theme_row(), self.notation_row(),
                 (tr("Speed"), self.speed_box), self.sound_row(), self.report_row()]
 
-save(clé, valeur) enregistre le réglage, l'écrit dans le journal et prévient
-les pages (bus.settings_changed). credits() donne le texte sous la carte.
+save(key, value) saves the setting, writes it to the log and notifies
+the pages (bus.settings_changed). credits() gives the text under the card.
 """
 
 from __future__ import annotations

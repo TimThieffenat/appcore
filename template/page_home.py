@@ -1,10 +1,10 @@
-"""Page d'accueil : un exemple qui montre les outils du socle (à remplacer).
+"""Home page: an example showing the base's tools (to replace).
 
-- textes : tr("…") (traduits avec locales/<code>.py) ;
-- contrôles tactiles : ui.combo, ui.ToolStrip, ui.label, ui.page_margins ;
-- son : sound.synth() (l'instrument des réglages) et sound.playback() ;
-- réglages : bus.settings_changed quand un réglage change (thème, notes…) ;
-- arrière-plan : app_paused() / app_resumed() appelés par la fenêtre.
+- texts: tr("…") (translated with locales/<code>.py);
+- touch controls: ui.combo, ui.ToolStrip, ui.label, ui.page_margins;
+- sound: sound.synth() (the instrument from the settings) and sound.playback();
+- settings: bus.settings_changed when a setting changes (theme, notes…);
+- background: app_paused() / app_resumed() called by the window.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ class HomePage(QWidget):
         bus.settings_changed.connect(self._refresh)
 
     def _refresh(self, *_) -> None:
-        """Les noms des notes suivent le réglage (lettres ou Do Ré Mi)."""
+        """Note names follow the setting (letters or Do Ré Mi)."""
         ui.fill_roots(self.root_box, self.root_box.currentData() or "C",
                       ui.notation(self.settings))
         self._refresh_hero()
@@ -62,14 +62,14 @@ class HomePage(QWidget):
         self.hero.setText(mt.key_title(root, "Major", ui.notation(self.settings)))
 
     def _play(self) -> None:
-        """Un arpège majeur sur la note choisie, avec l'instrument des réglages."""
+        """A major arpeggio on the chosen note, with the instrument from the settings."""
         root = mt.note_pc(self.root_box.currentData() or "C")
         notes = [48 + root + step for step in (0, 4, 7, 12, 16)]
         log.info("play: %s", self.root_box.currentData())
         sound.playback().play(arpeggio(sound.synth(), notes), self)
 
     def app_paused(self) -> None:
-        """L'app passe en arrière-plan (la fenêtre a déjà coupé le son)."""
+        """The app goes to the background (the window has already stopped the sound)."""
 
     def app_resumed(self) -> None:
-        """Retour au premier plan."""
+        """Back to the foreground."""

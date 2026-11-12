@@ -1,35 +1,35 @@
-"""Journal de l'app et rapport d'erreur : quand l'app plante, elle dit pourquoi,
-et le rapport part par e-mail en un geste.
+"""The app's log and error report: when the app crashes, it says why,
+and the report goes by email in one gesture.
 
-Fichiers (dossier logs/ de l'app sur Android, ~/.<nom de l'app> sur ordinateur,
-par exemple ~/.rifffinder) :
+Files (the app's logs/ folder on Android, ~/.<app name> on desktop,
+for example ~/.rifffinder):
 
-- `app.log` : le journal, ce que l'app a fait (démarrage chronométré, pages,
-  réglages changés, son, et ce que l'app y écrit elle-même, avertissements
-  de Qt, erreurs). 150 Ko au plus, plus l'ancien `app.log.1` ;
-- `crash.log` : les erreurs Python, avec la pile d'appels ;
-- `native.log` : si le processus meurt (plantage dans Qt ou Android),
-  faulthandler y écrit la pile Python du moment ;
-- `qt.log` : les avertissements de Qt du lancement (souvent la cause d'un
-  plantage natif) ;
-- `startup.txt` : l'étape du démarrage en cours ; s'il est encore là au
-  lancement suivant, l'app s'est arrêtée pendant le démarrage ;
-- `exit_reasons.txt` (Android 11 et plus) : pourquoi Android a arrêté l'app
-  les dernières fois (plantage Java ou natif, « ne répond pas », mémoire…),
-  écrit par l'activité Java (android/java/…/ExitReasons.java) avant le
-  démarrage de Python, avec la trace du plantage (`exit_<date>.trace`).
+- `app.log`: the log, what the app did (timed start-up, pages,
+  settings changed, sound, and what the app writes there itself, Qt
+  warnings, errors). 150 KB at most, plus the previous `app.log.1`;
+- `crash.log`: Python errors, with the stack trace;
+- `native.log`: if the process dies (crash in Qt or Android),
+  faulthandler writes the Python stack of that moment there;
+- `qt.log`: Qt warnings of the start-up (often the cause of a
+  native crash);
+- `startup.txt`: the start-up step in progress; if it is still there at the
+  next start, the app stopped during start-up;
+- `exit_reasons.txt` (Android 11 and later): why Android stopped the app
+  the last times (Java or native crash, "not responding", memory…),
+  written by the Java activity (android/java/…/ExitReasons.java) before
+  Python starts, with the crash trace (`exit_<date>.trace`).
 
-Une erreur au démarrage s'affiche tout de suite (au lieu de fermer l'app). Un
-plantage s'affiche au lancement suivant. Réglages › « Error report » montre le
-rapport à tout moment. « Send by email » ouvre l'app d'e-mail du téléphone avec
-le rapport, adressé à SUPPORT_EMAIL (app_info.py) : rien ne part sans que
-l'utilisateur appuie sur Envoyer. Le rapport ne contient que des informations
-techniques (versions, modèle du téléphone, réglages, erreurs, journal) : ni
-données de l'utilisateur, ni sons, ni noms de fichiers.
+An error at start-up is shown at once (instead of closing the app). A
+crash is shown at the next start. Settings › "Error report" shows the
+report at any time. "Send by email" opens the phone's email app with
+the report, addressed to SUPPORT_EMAIL (app_info.py): nothing is sent until
+the user taps Send. The report only holds technical information
+(versions, phone model, settings, errors, log): no user data,
+no sounds, no file names.
 
-Ce module ne dépend que de la bibliothèque standard, de PySide6 et de
-appcore/app.py (qui lit app_info.py sans rien importer d'autre) : il doit
-marcher même si le reste de l'app ne se charge pas.
+This module only depends on the standard library, PySide6 and
+appcore/app.py (which reads app_info.py without importing anything else): it must
+work even if the rest of the app does not load.
 """
 
 from __future__ import annotations
@@ -47,27 +47,27 @@ import traceback
 from pathlib import Path
 from urllib.parse import quote
 
-MAX_LOG = 40_000        # octets gardés par fichier d'erreurs
-LAUNCH_MARK = "=== launch"  # sépare les lancements dans crash.log et app.log
-STARTUP_GRACE_MS = 3000  # l'app est « démarrée » 3 s après l'affichage de la fenêtre
+MAX_LOG = 40_000        # bytes kept per error file
+LAUNCH_MARK = "=== launch"  # separates launches in crash.log and app.log
+STARTUP_GRACE_MS = 3000  # the app is "started" 3 s after the window is shown
 JOURNAL = "app.log"
-JOURNAL_MAX = 150_000   # au-delà, le journal devient app.log.1 (un seul ancien gardé)
-EXIT_FILE = "exit_reasons.txt"       # écrit par l'activité Java au démarrage
-EXIT_PREV = "exit_reasons_prev.txt"  # le dernier lu, pour le rapport
-KEEP_TRACES = 3         # traces de plantage Android gardées
-QT_MESSAGES_MAX = 300   # avertissements de Qt écrits dans le journal, par lancement
-# Réglages recopiés dans le rapport (pour refaire le problème dans les mêmes
-# conditions) : ceux du socle, le son, puis REPORT_SETTINGS de app_info.py
+JOURNAL_MAX = 150_000   # beyond this, the log becomes app.log.1 (a single old one kept)
+EXIT_FILE = "exit_reasons.txt"       # written by the Java activity at start-up
+EXIT_PREV = "exit_reasons_prev.txt"  # the last one read, for the report
+KEEP_TRACES = 3         # Android crash traces kept
+QT_MESSAGES_MAX = 300   # Qt warnings written to the log, per launch
+# Settings copied into the report (to reproduce the problem in the same
+# conditions): the base's, the sound, then REPORT_SETTINGS of app_info.py
 SETTING_KEYS = ("language", "theme", "notation")
 
-# Causes d'arrêt d'Android (ApplicationExitInfo.REASON_*) qui sont un problème :
-# plantage Java, plantage natif, « ne répond pas », échec au lancement, ressources
+# Android exit reasons (ApplicationExitInfo.REASON_*) that are a problem:
+# Java crash, native crash, "not responding", start-up failure, resources
 PROBLEM_REASONS = {4, 5, 6, 7, 9}
-LOW_MEMORY = 3          # manque de mémoire : un problème si l'app était à l'écran
-VISIBLE = 200           # importance ≤ 200 : l'app était à l'écran
+LOW_MEMORY = 3          # out of memory: a problem if the app was on screen
+VISIBLE = 200           # importance ≤ 200: the app was on screen
 
-# Taille des parties du rapport (caractères) : à l'écran, et dans l'e-mail
-# (une adresse « mailto: » trop longue est coupée par certaines apps d'e-mail)
+# Size of the report's parts (characters): on screen, and in the email
+# (a "mailto:" address that is too long gets cut by some email apps)
 SCREEN_BUDGET = {"previous": 20_000, "errors": 15_000, "journal": 20_000, "android": 8_000}
 EMAIL_BUDGET = {"previous": 7_000, "errors": 5_000, "journal": 7_000, "android": 2_500}
 
@@ -76,15 +76,15 @@ log = logging.getLogger("crash_report")
 _dir: Path | None = None
 _native_file = None
 _qt_file = None
-_previous = ""          # rapport du lancement précédent (vide : tout allait bien)
+_previous = ""          # report of the previous launch (empty: all was well)
 _installed = False
 _started = time.monotonic()
-_android_log_since = time.time()   # le journal d'Android du rapport commence ici
+_android_log_since = time.time()   # the report's Android log starts here
 _startup_logged = False
 
 
 # =========================================================================================
-# Dossier et fichiers
+# Folder and files
 # =========================================================================================
 
 def on_android() -> bool:
@@ -93,9 +93,9 @@ def on_android() -> bool:
 
 
 def log_dir() -> Path:
-    """Un dossier où l'on peut écrire : files/logs sur Android (privé à l'app,
-    gardé quand l'app est mise à jour, et connu de l'activité Java),
-    ~/.<nom de l'app> sur un ordinateur."""
+    """A writable folder: files/logs on Android (private to the app,
+    kept when the app is updated, and known to the Java activity),
+    ~/.<app name> on a computer."""
     global _dir
     if _dir is not None:
         return _dir
@@ -103,7 +103,7 @@ def log_dir() -> Path:
     if on_android():
         if os.environ.get("ANDROID_PRIVATE"):
             candidates.append(Path(os.environ["ANDROID_PRIVATE"]) / "logs")
-        candidates.append(Path(__file__).resolve().parent.parent)   # dossier de l'app
+        candidates.append(Path(__file__).resolve().parent.parent)   # the app's folder
     folder_name = _app_slug()
     candidates += [Path.home() / f".{folder_name}", Path(tempfile.gettempdir()) / folder_name]
     for folder in candidates:
@@ -135,7 +135,7 @@ def _unlink(name: str) -> None:
 
 
 def _tail(text: str, limit: int = MAX_LOG) -> str:
-    """La fin d'un texte (le plus récent), coupée au début d'une ligne."""
+    """The end of a text (the most recent), cut at the start of a line."""
     if len(text) <= limit:
         return text
     cut = text[-limit:]
@@ -143,7 +143,7 @@ def _tail(text: str, limit: int = MAX_LOG) -> str:
 
 
 def _head(text: str, limit: int) -> str:
-    """Le début d'un texte (le plus important d'abord)."""
+    """The start of a text (the most important first)."""
     return text if len(text) <= limit else text[:limit].rsplit("\n", 1)[0] + "\n…"
 
 
@@ -165,11 +165,11 @@ def _elapsed_ms() -> int:
 
 
 # =========================================================================================
-# Le téléphone, l'app, les réglages
+# The phone, the app, the settings
 # =========================================================================================
 
 def _system_property(name: str) -> str:
-    """Propriété d'Android (modèle, version…), sans autorisation particulière."""
+    """Android property (model, version…), with no particular permission."""
     try:
         import ctypes
         libc = ctypes.CDLL("libc.so")
@@ -190,7 +190,7 @@ def _system_property(name: str) -> str:
 
 
 def device_name() -> str:
-    """« Google Pixel 7 », « samsung SM-A515F »… ou le système de l'ordinateur."""
+    """"Google Pixel 7", "samsung SM-A515F"… or the computer's system."""
     if on_android():
         maker = _system_property("ro.product.manufacturer")
         model = _system_property("ro.product.model")
@@ -220,7 +220,7 @@ def _app_slug() -> str:
 
 
 def app_title() -> str:
-    """« RiffFinder 1.2.0 » (le nom et la version de app_info.py)."""
+    """"RiffFinder 1.2.0" (the name and version from app_info.py)."""
     try:
         from appcore import app as config
         return f"{config.name()} {config.version()}"
@@ -258,7 +258,7 @@ def versions_summary() -> str:
 
 
 def settings_summary() -> str:
-    """Langue et réglages (vide tant que l'application Qt n'est pas créée)."""
+    """Language and settings (empty until the Qt application is created)."""
     try:
         from PySide6.QtCore import QCoreApplication, QSettings
         if QCoreApplication.instance() is None:
@@ -303,7 +303,7 @@ def environment() -> list[str]:
 
 
 def log_context() -> None:
-    """Réglages et écran dans le journal (une fois la fenêtre affichée)."""
+    """Settings and screen in the log (once the window is shown)."""
     settings, screen = settings_summary(), screen_summary()
     if settings:
         log.info("settings: %s", settings)
@@ -312,11 +312,11 @@ def log_context() -> None:
 
 
 # =========================================================================================
-# Installation (tout au début de main.py)
+# Installation (at the very start of main.py)
 # =========================================================================================
 
 def install() -> None:
-    """À appeler avant d'importer le reste de l'app."""
+    """Call before importing the rest of the app."""
     global _native_file, _qt_file, _previous, _installed
     if _installed:
         return
@@ -327,13 +327,13 @@ def install() -> None:
     log.info("%s", versions_summary())
     log.info("device: %s", device_summary())
     _previous = _collect_previous()
-    # Plantage natif : faulthandler écrit la pile dans native.log (vide si tout va bien)
+    # Native crash: faulthandler writes the stack to native.log (empty if all is well)
     try:
         _native_file = open(folder / "native.log", "w", encoding="utf-8")  # noqa: SIM115
         faulthandler.enable(file=_native_file, all_threads=True)
     except Exception:  # noqa: BLE001
         _native_file = None
-    # Messages de Qt de ce lancement (le précédent est gardé dans qt_prev.log)
+    # Qt messages of this launch (the previous one is kept in qt_prev.log)
     try:
         if (folder / "qt.log").exists():
             os.replace(folder / "qt.log", folder / "qt_prev.log")
@@ -347,14 +347,14 @@ def install() -> None:
 
 
 class _JournalHandler(logging.FileHandler):
-    """Le journal app.log : au-delà de JOURNAL_MAX octets, il devient app.log.1
-    (l'ancien app.log.1 est remplacé) et un nouveau commence."""
+    """The app.log log: beyond JOURNAL_MAX bytes, it becomes app.log.1
+    (the old app.log.1 is replaced) and a new one starts."""
 
-    def emit(self, record) -> None:   # appelé sous le verrou du handler
+    def emit(self, record) -> None:   # called under the handler's lock
         try:
             if self.stream is not None and self.stream.tell() > JOURNAL_MAX:
                 self.stream.close()
-                self.stream = None      # FileHandler.emit le rouvre
+                self.stream = None      # FileHandler.emit reopens it
                 os.replace(self.baseFilename, self.baseFilename + ".1")
         except (OSError, ValueError):
             pass
@@ -373,13 +373,13 @@ def _setup_journal(folder: Path) -> None:
         root.addHandler(handler)
     except OSError:
         pass
-    # Avertissements et erreurs aussi dans la console (logcat sur Android)
+    # Warnings and errors also in the console (logcat on Android)
     console = logging.StreamHandler()
     console.setLevel(logging.WARNING)
     console.setFormatter(fmt)
     root.addHandler(console)
     root.setLevel(logging.INFO)
-    logging.captureWarnings(True)     # warnings.warn(...) -> journal
+    logging.captureWarnings(True)     # warnings.warn(...) -> log
 
 
 def _journal_handler() -> _JournalHandler | None:
@@ -387,7 +387,7 @@ def _journal_handler() -> _JournalHandler | None:
 
 
 def journal_tail(limit: int) -> str:
-    """La fin du journal (ancien fichier compris), le plus récent en dernier."""
+    """The end of the log (old file included), most recent last."""
     handler = _journal_handler()
     if handler is not None:
         handler.flush()
@@ -396,7 +396,7 @@ def journal_tail(limit: int) -> str:
 
 
 def _collect_previous() -> str:
-    """Ce qui s'est mal passé au lancement précédent ("" si rien)."""
+    """What went wrong at the previous launch ("" if nothing)."""
     parts = []
     native = _read("native.log").strip()
     startup = _read("startup.txt").strip()
@@ -422,7 +422,7 @@ def _collect_previous() -> str:
         lines = qt.splitlines()[-40:]
         parts.append("Last Qt messages:\n" + "\n".join(lines))
     errors = _read("crash.log").rsplit(LAUNCH_MARK, 1)[-1].split("\n", 1)[-1].strip()
-    if errors:  # celles du lancement précédent seulement
+    if errors:  # only those of the previous launch
         parts.append("Python errors of that launch:\n" + _tail(errors, 6000))
     for name in ("fatal.txt", "startup.txt"):
         _unlink(name)
@@ -435,7 +435,7 @@ def previous_crash() -> str:
 
 
 def step(name: str) -> None:
-    """Note l'étape du démarrage en cours (effacée quand l'app a bien démarré)."""
+    """Records the start-up step in progress (cleared once the app has started)."""
     try:
         (log_dir() / "startup.txt").write_text(f"{name} ({_stamp()})", encoding="utf-8")
     except OSError:
@@ -452,7 +452,7 @@ def startup_done() -> None:
 
 
 def record_fatal(text: str) -> None:
-    """Erreur qui empêche le démarrage : gardée pour le prochain lancement aussi."""
+    """Error preventing start-up: kept for the next launch too."""
     _append("crash.log", f"[{_stamp()}] startup failed\n{text}\n")
     try:
         (log_dir() / "fatal.txt").write_text(text, encoding="utf-8")
@@ -482,15 +482,15 @@ def _thread_excepthook(args) -> None:
 
 
 # =========================================================================================
-# Causes d'arrêt données par Android (écrites par android/java/…/ExitReasons.java)
+# Exit reasons given by Android (written by android/java/…/ExitReasons.java)
 # =========================================================================================
 
 _EXIT_KEYS = re.compile(r"^reason=(-?\d+) importance=(-?\d+)(?: status=(-?\d+))?(?: trace=(\S+))?\s*$")
 
 
 def parse_exit_reasons(text: str) -> list[dict]:
-    """Les arrêts décrits par l'activité Java : un bloc « === date · cause »
-    par arrêt, avec une ligne « reason=… importance=… [trace=fichier] »."""
+    """The exits described by the Java activity: a "=== date · reason" block
+    per exit, with a "reason=… importance=… [trace=file]" line."""
     exits = []
     for block in re.split(r"(?m)^(?==== )", text):
         block = block.strip()
@@ -517,7 +517,7 @@ def _is_problem(entry: dict) -> bool:
 
 
 def _take_exit_reasons() -> list[dict]:
-    """Lit (puis range) ce que l'activité Java a écrit sur les derniers arrêts."""
+    """Reads (then files away) what the Java activity wrote about the last exits."""
     text = _read(EXIT_FILE)
     if not text.strip():
         return []
@@ -545,8 +545,8 @@ def _take_exit_reasons() -> list[dict]:
 
 
 def trace_summary(path: Path, max_lines: int = 120) -> str:
-    """Trace d'un arrêt : texte pour « ne répond pas » (ANR), tombstone
-    (protobuf) pour un plantage natif."""
+    """Trace of an exit: text for "not responding" (ANR), tombstone
+    (protobuf) for a native crash."""
     try:
         data = path.read_bytes()
     except OSError:
@@ -575,8 +575,8 @@ def _varint(data: bytes, i: int) -> tuple[int, int]:
 
 
 def _proto_fields(data: bytes) -> list[tuple[int, object]]:
-    """Champs d'un message protobuf : (numéro, entier ou octets). S'arrête sans
-    erreur sur un message tronqué (la trace est limitée en taille)."""
+    """Fields of a protobuf message: (number, integer or bytes). Stops without
+    error on a truncated message (the trace is size-limited)."""
     fields: list[tuple[int, object]] = []
     i = 0
     try:
@@ -603,12 +603,12 @@ def _proto_fields(data: bytes) -> list[tuple[int, object]]:
 
 
 def _int(fields: list[tuple[int, object]], number: int) -> int | None:
-    """Premier champ entier `number` d'un message (None s'il manque)."""
+    """First integer field `number` of a message (None if missing)."""
     return next((v for n, v in fields if n == number and isinstance(v, int)), None)
 
 
 def _bytes(fields: list[tuple[int, object]], number: int) -> bytes | None:
-    """Premier champ texte / sous-message `number` d'un message."""
+    """First text / sub-message field `number` of a message."""
     return next((v for n, v in fields if n == number and isinstance(v, bytes)), None)
 
 
@@ -617,9 +617,9 @@ def _text(value) -> str:
 
 
 def tombstone_summary(data: bytes, max_frames: int = 40) -> str:
-    """Signal, message d'abandon et pile du fil qui a planté, lus dans le
-    tombstone d'Android (system/core/debuggerd/proto/tombstone.proto). Si la
-    lecture échoue : les textes lisibles de la trace."""
+    """Signal, abort message and stack of the crashed thread, read from the
+    Android tombstone (system/core/debuggerd/proto/tombstone.proto). If
+    reading fails: the readable texts of the trace."""
     lines = []
     try:
         top = _proto_fields(data)
@@ -665,7 +665,7 @@ def tombstone_summary(data: bytes, max_frames: int = 40) -> str:
                 frames += 1
         if frames:
             return "\n".join(lines)
-    except Exception:  # noqa: BLE001 — format inattendu : les textes lisibles
+    except Exception:  # noqa: BLE001 — unexpected format: the readable texts
         pass
     strings = []
     for raw in re.findall(rb"[\x20-\x7e]{6,}", data):
@@ -678,33 +678,33 @@ def tombstone_summary(data: bytes, max_frames: int = 40) -> str:
 
 
 def _logcat(*args: str, timeout: float = 3.0) -> str:
-    """Journal d'Android : sans autorisation, une app n'y lit que ses propres lignes."""
+    """Android's log: without permission, an app only reads its own lines there."""
     if not on_android():
         return ""
     exe = "/system/bin/logcat" if os.path.exists("/system/bin/logcat") else "logcat"
     try:
         import subprocess
         out = subprocess.run([exe, "-d", *args], capture_output=True, timeout=timeout)
-    except Exception:  # noqa: BLE001 — pas de logcat : le rapport s'en passe
+    except Exception:  # noqa: BLE001 — no logcat: the report does without
         return ""
     return out.stdout.decode("utf-8", errors="replace")
 
 
 def android_log(limit: int) -> str:
-    """Avertissements et erreurs d'Android pour l'app, depuis ce lancement."""
+    """Android warnings and errors for the app, since this launch."""
     since = time.strftime("%m-%d %H:%M:%S.000", time.localtime(_android_log_since))
     text = _logcat("-v", "time", "-T", since, "*:W").strip()
     return _tail(text, limit) if text else ""
 
 
 # =========================================================================================
-# Messages de Qt
+# Qt messages
 # =========================================================================================
 
 def install_qt_messages(app) -> None:
-    """Garde les avertissements de Qt dans qt.log et dans le journal (et
-    toujours dans la console / logcat). Retiré à la fermeture : rien n'est
-    appelé pendant l'arrêt de Qt."""
+    """Keeps Qt warnings in qt.log and in the log (and always in
+    the console / logcat). Removed at shutdown: nothing is
+    called while Qt stops."""
     try:
         from PySide6.QtCore import QtMsgType, qInstallMessageHandler
     except ImportError:
@@ -721,8 +721,8 @@ def install_qt_messages(app) -> None:
             sys.stderr.write(line + "\n")
             if _qt_file is not None:
                 _qt_file.write(line + "\n")
-            # Journal : un message répété n'est écrit qu'une fois, et pas plus de
-            # QT_MESSAGES_MAX par lancement
+            # Log: a repeated message is written only once, and no more than
+            # QT_MESSAGES_MAX per launch
             if message == state["last"]:
                 state["repeats"] += 1
                 return
@@ -734,7 +734,7 @@ def install_qt_messages(app) -> None:
                 level = logging.INFO if name == "Info" else logging.WARNING \
                     if name == "Warning" else logging.ERROR
                 qt_log.log(level, "%s", message)
-        except Exception:  # noqa: BLE001 — ne jamais lever dans le gestionnaire
+        except Exception:  # noqa: BLE001 — never raise in the handler
             pass
 
     try:
@@ -745,12 +745,12 @@ def install_qt_messages(app) -> None:
 
 
 # =========================================================================================
-# Rapport complet (bouton des réglages, e-mail)
+# Full report (settings button, email)
 # =========================================================================================
 
 def full_report(compact: bool = False) -> str:
-    """Tout ce qu'on sait, pour l'envoyer à qui corrige l'app. `compact` : la
-    version de l'e-mail (parties plus courtes)."""
+    """Everything known, to send to whoever fixes the app. `compact`: the
+    email version (shorter parts)."""
     budget = EMAIL_BUDGET if compact else SCREEN_BUDGET
     parts = ["\n".join(environment())]
     if _previous:
@@ -769,7 +769,7 @@ def full_report(compact: bool = False) -> str:
 
 
 def python_errors() -> str:
-    """Les erreurs de crash.log, chaque lancement qui en a eu sous sa date."""
+    """The errors of crash.log, each launch that had some under its date."""
     blocks = re.split(rf"(?m)^(?={re.escape(LAUNCH_MARK)})", _read("crash.log"))
     kept = []
     for block in blocks:
@@ -780,7 +780,7 @@ def python_errors() -> str:
 
 
 def clear_logs() -> None:
-    """Efface les erreurs, le journal et les traces (après un envoi, par exemple)."""
+    """Clears the errors, the log and the traces (after sending, for example)."""
     global _previous, _android_log_since
     _previous = ""
     _android_log_since = time.time()
@@ -820,15 +820,15 @@ def email_subject() -> str:
 
 
 def email_url(report: str, intro: str = "") -> str:
-    """Adresse « mailto: » : destinataire, sujet et texte déjà remplis."""
+    """"mailto:" address: recipient, subject and text already filled in."""
     body = (intro + "\n\n\n" if intro else "") + "---- report ----\n" + report
     return (f"mailto:{support_email()}?subject={quote(email_subject(), safe='')}"
             f"&body={quote(body, safe='')}")
 
 
 def send_by_email(report: str, intro: str = "") -> bool:
-    """Ouvre l'app d'e-mail avec le rapport (l'utilisateur le relit et l'envoie).
-    False si aucune app d'e-mail ne s'est ouverte."""
+    """Opens the email app with the report (the user reads it again and sends it).
+    False if no email app opened."""
     try:
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
@@ -841,12 +841,12 @@ def send_by_email(report: str, intro: str = "") -> bool:
 
 
 # =========================================================================================
-# Fenêtre du rapport
+# Report window
 # =========================================================================================
 
 def report_view(text: str, title: str, on_close=None, parent=None, can_clear: bool = False):
-    """Panneau : titre, explication, texte du rapport (sélectionnable), boutons
-    « Send by email », Copy, (Clear) et Close. Ne dépend que de PySide6."""
+    """Panel: title, explanation, report text (selectable), buttons
+    "Send by email", Copy, (Clear) and Close. Only depends on PySide6."""
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QFont, QGuiApplication
     from PySide6.QtWidgets import (
@@ -859,9 +859,9 @@ def report_view(text: str, title: str, on_close=None, parent=None, can_clear: bo
         QWidget,
     )
 
-    try:   # textes de l'écran traduits ; le rapport lui-même reste en anglais
+    try:   # screen texts translated; the report itself stays in English
         from appcore.i18n import tr
-    except Exception:  # noqa: BLE001 — le rapport doit s'afficher quoi qu'il arrive
+    except Exception:  # noqa: BLE001 — the report must be shown whatever happens
         def tr(text: str, /, **fields) -> str:
             return text.format(**fields) if fields else text
 
@@ -909,7 +909,7 @@ def report_view(text: str, title: str, on_close=None, parent=None, can_clear: bo
     status.setWordWrap(True)
 
     def send() -> None:
-        # le texte complet est copié aussi : si l'app d'e-mail coupe le rapport, on le colle
+        # the full text is copied too: if the email app cuts the report, it can be pasted
         QGuiApplication.clipboard().setText(current["text"])
         report = full_report(compact=True)
         intro = tr("What were you doing when the problem happened? (optional)")
@@ -958,7 +958,7 @@ def report_view(text: str, title: str, on_close=None, parent=None, can_clear: bo
 
 
 def show_over(window, text: str, title: str, can_clear: bool = False):
-    """Affiche le rapport par-dessus la fenêtre principale."""
+    """Shows the report over the main window."""
     view = report_view(text, title, parent=window, can_clear=can_clear)
     margin = 10
     view.setGeometry(margin, margin, max(200, window.width() - 2 * margin),

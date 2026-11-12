@@ -15,7 +15,7 @@ Every app that uses them must credit them (Settings page, `credits()`).
 Changes made (`tools/build_sounds.py` in RiffFinder): each note is trimmed to its
 attack, retuned exactly (the originals were a few cents off), resampled to
 24 kHz, cut once it has died away and normalised. Exact tuning matters: PerfectPitch's
-« Out of tune » mode detunes one note on purpose, all the others must be right.
+"Out of tune" mode detunes one note on purpose, all the others must be right.
 
 ## Soft keys
 

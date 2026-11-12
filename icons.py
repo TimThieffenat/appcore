@@ -1,11 +1,11 @@
-"""Icônes dessinées en code (aucun fichier image), partagées par les apps.
+"""Icons drawn in code (no image file), shared by the apps.
 
-Chaque icône est tracée sur une grille de 24 × 24, en traits arrondis, dans
-la couleur demandée. `nav_icon` fait les icônes du rail (deux états) ;
-`paint` dessine une icône dans un rectangle (cartes, trophées, bilan).
+Each icon is drawn on a 24 × 24 grid, with rounded strokes, in the
+requested colour. `nav_icon` makes the rail icons (two states);
+`paint` draws an icon in a rectangle (cards, trophies, results).
 
-Le socle a les icônes de tous les jours (réglages, lecture, stats, trophée,
-étoile, coche…). Chaque app ajoute les siennes dans son icons.py :
+The base has the everyday icons (settings, play, stats, trophy,
+star, check mark…). Each app adds its own in its icons.py:
 
     from appcore.icons import *          # noqa: F403
     from appcore.icons import register
@@ -13,7 +13,7 @@ Le socle a les icônes de tous les jours (réglages, lecture, stats, trophée,
     def _neck(p, color): ...
     register("neck", _neck)
 
-Une icône de l'app peut remplacer celle du socle du même nom.
+An app icon can replace the base's icon of the same name.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 
 SIZE = 24
-RATIO = 3.0  # dessinée en haute définition pour rester nette sur téléphone
+RATIO = 3.0  # drawn in high definition to stay sharp on a phone
 
 
 def _note_head(p: QPainter, color: QColor, x: float, y: float, r: float = 2.6) -> None:
@@ -159,7 +159,7 @@ def _compass(p: QPainter, color: QColor) -> None:
 
 
 def _level(p: QPainter, color: QColor) -> None:
-    # chevrons qui montent
+    # rising chevrons
     for y in (16, 10.5, 5):
         p.drawLine(QPointF(6, y + 3.5), QPointF(12, y))
         p.drawLine(QPointF(12, y), QPointF(18, y + 3.5))
@@ -207,7 +207,7 @@ def _create(p: QPainter, color: QColor) -> None:
 
 
 def _unknown(p: QPainter, color: QColor) -> None:
-    """Icône d'un nom inconnu : un rond (rien ne plante s'il en manque une)."""
+    """Icon with an unknown name: a circle (nothing crashes if one is missing)."""
     p.drawEllipse(QPointF(12, 12), 7, 7)
 
 
@@ -220,18 +220,18 @@ DRAWERS = {
 
 
 def register(name: str, drawer) -> None:
-    """Ajoute (ou remplace) une icône : drawer(p, couleur) dessine sur la grille 24 × 24,
-    avec le crayon déjà réglé (couleur, épaisseur 1,7, bouts ronds) et sans remplissage."""
+    """Adds (or replaces) an icon: drawer(p, colour) draws on the 24 × 24 grid,
+    with the pen already set (colour, width 1.7, round caps) and no fill."""
     DRAWERS[name] = drawer
 
 
 def note_head(p: QPainter, color: QColor, x: float, y: float, r: float = 2.6) -> None:
-    """Tête de note pleine (pour les icônes de musique des apps)."""
+    """Filled note head (for the apps' music icons)."""
     _note_head(p, color, x, y, r)
 
 
 def paint(p: QPainter, name: str, rect: QRectF, color: str | QColor, width: float = 1.7) -> None:
-    """Dessine l'icône `name` dans `rect` (carré conseillé)."""
+    """Draws the icon `name` in `rect` (square recommended)."""
     qcolor = QColor(color)
     side = min(rect.width(), rect.height())
     p.save()
@@ -256,7 +256,7 @@ def _pixmap(name: str, color: str) -> QPixmap:
 
 
 def nav_icon(name: str, normal: str, active: str) -> QIcon:
-    """Icône à deux états : grise (bouton relâché) et accentuée (page active)."""
+    """Two-state icon: grey (button released) and accented (active page)."""
     icon = QIcon()
     icon.addPixmap(_pixmap(name, normal), QIcon.Mode.Normal, QIcon.State.Off)
     icon.addPixmap(_pixmap(name, active), QIcon.Mode.Normal, QIcon.State.On)

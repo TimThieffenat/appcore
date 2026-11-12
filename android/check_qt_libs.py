@@ -1,14 +1,14 @@
-"""Vérifie qu'un APK / AAB contient toutes les bibliothèques que Qt charge au
-démarrage.
+"""Checks that an APK / AAB holds all the libraries Qt loads at
+start-up.
 
-Qt lit ses listes (res/values/libs.xml : qt_libs, load_local_libs,
-bundled_libs) et charge chaque bibliothèque, dans l'ordre ; à la première
-introuvable (« QtLoader: Can't find … »), l'app se ferme aussitôt. Ce script
-relit ces listes dans le fichier compilé (resources.arsc dans un APK,
-resources.pb dans un AAB) et cherche chaque fichier dans lib/<abi>/.
+Qt reads its lists (res/values/libs.xml: qt_libs, load_local_libs,
+bundled_libs) and loads each library, in order; at the first one
+not found ("QtLoader: Can't find …"), the app closes at once. This script
+reads those lists again in the built file (resources.arsc in an APK,
+resources.pb in an AAB) and looks for each file in lib/<abi>/.
 
-Usage : python android/check_qt_libs.py <fichier.apk|.aab> [...]
-Code de sortie 1 s'il en manque une. N'a besoin que de Python.
+Usage: python android/check_qt_libs.py <file.apk|.aab> [...]
+Exit code 1 if one is missing. Only needs Python.
 """
 
 from __future__ import annotations
@@ -19,18 +19,18 @@ import zipfile
 from pathlib import Path
 
 ABIS = ("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-# Une entrée des listes : « arm64-v8a;Qt6Core_arm64-v8a » ou « arm64-v8a;libx.so:liby.so »
+# An entry of the lists: "arm64-v8a;Qt6Core_arm64-v8a" or "arm64-v8a;libx.so:liby.so"
 ENTRY = re.compile(r"(arm64-v8a|armeabi-v7a|x86_64|x86);([A-Za-z0-9_.+:-]+)")
 
 
 def library_file(name: str) -> str:
-    """Comme QtLoader.java : un nom sans .so devient lib<nom>.so."""
+    """Like QtLoader.java: a name without .so becomes lib<name>.so."""
     return name if name.endswith(".so") else f"lib{name}.so"
 
 
 def _strings(data: bytes) -> set[str]:
-    """Entrées « abi;bibliothèques » trouvées dans les ressources compilées
-    (chaînes UTF-8 et UTF-16)."""
+    """"abi;libraries" entries found in the compiled resources
+    (UTF-8 and UTF-16 strings)."""
     found = set()
     for text in (data.decode("latin-1"), data.decode("utf-16-le", errors="ignore")):
         for abi, names in ENTRY.findall(text):
@@ -39,7 +39,7 @@ def _strings(data: bytes) -> set[str]:
 
 
 def check(package: Path) -> tuple[list[str], list[str]]:
-    """Renvoie (bibliothèques trouvées, bibliothèques manquantes)."""
+    """Returns (libraries found, libraries missing)."""
     with zipfile.ZipFile(package) as zf:
         names = zf.namelist()
         resources = [n for n in names if n.endswith(("resources.arsc", "resources.pb"))]
@@ -55,7 +55,7 @@ def check(package: Path) -> tuple[list[str], list[str]]:
     for entry in sorted(entries):
         abi, libs = entry.split(";", 1)
         if abi not in present:
-            continue   # autre architecture, absente du paquet
+            continue   # another architecture, absent from the package
         for lib in libs.split(":"):
             if not lib:
                 continue
@@ -71,17 +71,17 @@ def main() -> int:
     status = 0
     for arg in sys.argv[1:]:
         found, missing = check(Path(arg))
-        print(f"Bibliothèques chargées par Qt au démarrage : {Path(arg).name}")
+        print(f"Libraries loaded by Qt at start-up: {Path(arg).name}")
         if not found and not missing:
-            print("  ? listes de Qt introuvables dans les ressources (rien vérifié)")
+            print("  ? Qt's lists not found in the resources (nothing checked)")
             continue
         if missing:
             status = 1
-            print(f"  ✗ {len(missing)} introuvable(s) dans le paquet : l'app se fermera "
-                  "au démarrage (« QtLoader: Can't find … ») :")
+            print(f"  ✗ {len(missing)} not found in the package: the app will close "
+                  "at start-up (\"QtLoader: Can't find …\"):")
             for line in missing:
                 print(f"    - {line}")
-        print(f"  ✓ {len(found)} présente(s)")
+        print(f"  ✓ {len(found)} present")
     return status
 
 

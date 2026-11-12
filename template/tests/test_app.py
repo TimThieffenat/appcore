@@ -1,6 +1,6 @@
-"""Tests de l'app sans Qt :  python -m unittest discover tests
+"""Tests of the app without Qt:  python -m unittest discover tests
 
-(Ceux du socle : python -m unittest discover -s appcore/tests -t .)
+(Those of the base: python -m unittest discover -s appcore/tests -t .)
 """
 
 from __future__ import annotations

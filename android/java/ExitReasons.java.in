@@ -1,5 +1,5 @@
-// Modèle du socle (appcore/android/java/) : build_apk.sh y met le paquet Java,
-// le nom de l'app (app_info.py) et le range dans le dossier de son paquet.
+// Base template (appcore/android/java/): build_apk.sh fills in the Java package
+// and the app's name (app_info.py) and puts it in its package's folder.
 package @JAVA_PACKAGE@;
 
 import android.annotation.TargetApi;
@@ -24,23 +24,23 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Pourquoi l'app s'est arrêtée les dernières fois, d'après Android (11 et plus).
+ * Why the app stopped the last times, according to Android (11 and later).
  *
- * Un plantage dans Qt ou dans Java, ou un « l'application ne répond pas »,
- * ferme l'app sans que Python puisse rien noter. Android, lui, garde la cause
- * de chaque arrêt (ApplicationExitInfo). Au démarrage, avant Python, on écrit
- * les nouveaux arrêts dans files/logs/exit_reasons.txt, et la trace d'un
- * plantage natif ou d'un ANR dans files/logs/exit_&lt;date&gt;.trace.
- * crash_report.py les lit, les met dans le rapport d'erreur et, si c'était un
- * plantage, le signale à l'écran.
+ * A crash in Qt or in Java, or an "app isn't responding",
+ * closes the app before Python can note anything. Android, however, keeps the reason
+ * for each exit (ApplicationExitInfo). At start-up, before Python, the
+ * new exits are written to files/logs/exit_reasons.txt, and the trace of a
+ * native crash or an ANR to files/logs/exit_&lt;date&gt;.trace.
+ * crash_report.py reads them, puts them in the error report and, if it was a
+ * crash, says so on screen.
  *
- * Format, un bloc par arrêt (le plus récent d'abord) :
+ * Format, one block per exit (most recent first):
  *   === 2026-10-19 14:02:11 · crash (native) · signal 11
  *   reason=5 importance=100 status=11 trace=exit_1760875331000.trace
  *   description: …
  *   memory: PSS 182 MB, RSS 240 MB
  *
- * Rien n'est envoyé nulle part. Aucune autorisation n'est nécessaire.
+ * Nothing is sent anywhere. No permission is needed.
  */
 final class ExitReasons {
     private static final String TAG = "@APP_NAME@";
@@ -56,14 +56,14 @@ final class ExitReasons {
     private ExitReasons() {
     }
 
-    /** À appeler au démarrage, avant Python. Ne lève jamais d'erreur. */
+    /** Call at start-up, before Python. Never throws. */
     static void save(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            return;   // ApplicationExitInfo : Android 11 (API 30) et plus
+            return;   // ApplicationExitInfo: Android 11 (API 30) and later
         }
         try {
             write(context);
-        } catch (Throwable error) {   // un rapport en moins, jamais une app qui ne démarre pas
+        } catch (Throwable error) {   // one report less, never an app that does not start
             Log.w(TAG, "exit reasons not saved: " + error);
         }
     }
@@ -85,11 +85,11 @@ final class ExitReasons {
         }
         prefs.edit().putLong(LAST, newest).apply();
         if (firstRun) {
-            return;   // premier lancement de cette version : les arrêts plus anciens ne comptent pas
+            return;   // first launch of this version: older exits do not count
         }
         File folder = new File(context.getFilesDir(), "logs");
         StringBuilder out = new StringBuilder();
-        for (ApplicationExitInfo exit : exits) {   // le plus récent d'abord
+        for (ApplicationExitInfo exit : exits) {   // most recent first
             if (exit.getTimestamp() > last) {
                 describe(exit, folder, out);
             }
@@ -132,7 +132,7 @@ final class ExitReasons {
                 .append(" MB, RSS ").append(exit.getRss() / 1024).append(" MB\n\n");
     }
 
-    /** Trace d'un plantage natif (tombstone, Android 12+) ou d'un ANR (texte). */
+    /** Trace of a native crash (tombstone, Android 12+) or an ANR (text). */
     @TargetApi(Build.VERSION_CODES.R)
     private static String saveTrace(ApplicationExitInfo exit, File folder) {
         int reason = exit.getReason();

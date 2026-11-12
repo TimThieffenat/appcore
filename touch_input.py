@@ -1,14 +1,14 @@
-"""Champs de saisie au clavier faits pour le téléphone (nombres et texte).
+"""Keyboard input fields made for the phone (numbers and text).
 
-Sur Android, après « Done » le champ gardait la main : le clavier se fermait
-puis se rouvrait aussitôt (la page se rafraîchissait à chaque chiffre tapé, et
-Android rouvre le clavier du champ qui a la main). Ici :
+On Android, after "Done" the field kept the focus: the keyboard closed
+then reopened at once (the page refreshed at each digit typed, and
+Android reopens the keyboard of the focused field). Here:
 
-- « Done » (ou Entrée) valide, rend la main et ferme le clavier pour de bon ;
-- quand le clavier se ferme autrement (bouton retour…), le champ rend la main
-  aussi : rien ne le rouvre tout seul ;
-- un nombre n'est pris en compte qu'à la fin de la saisie (pas à chaque
-  chiffre), avec un clavier numérique sans suggestions.
+- "Done" (or Enter) confirms, gives up the focus and closes the keyboard for good;
+- when the keyboard closes another way (Back button…), the field gives up the
+  focus too: nothing reopens it on its own;
+- a number is only taken at the end of input (not at each
+  digit), with a numeric keyboard without suggestions.
 """
 
 from __future__ import annotations
@@ -28,15 +28,15 @@ def _release(widget: QWidget) -> None:
     try:
         if widget.hasFocus():
             widget.clearFocus()
-    except RuntimeError:  # widget déjà détruit
+    except RuntimeError:  # widget already destroyed
         pass
     QGuiApplication.inputMethod().hide()
 
 
 def close_keyboard_later(widget: QWidget) -> None:
-    """Après la touche Entrée / Done : une fois que le champ a fini de la traiter,
-    il rend la main et le clavier se ferme ; une seconde fois un peu plus tard,
-    au cas où un rafraîchissement de la page l'aurait rouvert."""
+    """After the Enter / Done key: once the field has finished handling it,
+    it gives up the focus and the keyboard closes; a second time a bit later,
+    in case a page refresh reopened it."""
     QTimer.singleShot(0, lambda: _release(widget))
     QTimer.singleShot(200, lambda: _release(widget))
 
@@ -48,7 +48,7 @@ def _keyboard_visibility_changed() -> None:
 
 def _drop_focus_if_keyboard_hidden() -> None:
     if QGuiApplication.inputMethod().isVisible():
-        return  # simple passage d'un champ à l'autre : le clavier est revenu
+        return  # just moving from one field to another: the keyboard came back
     widget = QApplication.focusWidget()
     if isinstance(widget, (TouchSpinBox, TouchLineEdit)):
         widget.clearFocus()
@@ -63,13 +63,13 @@ def _watch_keyboard() -> None:
 
 
 def _is_enter(event) -> bool:
-    return event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)   # « Done » d'Android = Entrée
+    return event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)   # Android's "Done" = Enter
 
 
 class TouchSpinBox(QSpinBox):
     def __init__(self) -> None:
         super().__init__()
-        self.setKeyboardTracking(False)   # valeur prise à la fin de la saisie
+        self.setKeyboardTracking(False)   # value taken at the end of input
         self.setInputMethodHints(Qt.InputMethodHint.ImhDigitsOnly
                                  | Qt.InputMethodHint.ImhNoPredictiveText)
         _watch_keyboard()

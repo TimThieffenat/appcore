@@ -1,14 +1,14 @@
-"""Lecture des sons de guitare avec Qt Multimedia.
+"""Playing guitar sounds with Qt Multimedia.
 
-- `AudioPlayer` mélange en continu les sons en cours (« voix ») et les envoie
-  à la sortie audio, convertis au format de la carte son (stéréo, flottant…).
-  Comme sur une guitare, une note ou un accord touché continue de sonner quand
-  on en joue un autre : seule une corde rejouée coupe la note qu'elle portait.
-  Une suite (lick, gamme, morceau) remplacée ou arrêtée s'éteint en un court
-  fondu, sans claquement.
-- `Playback` suit une lecture à la fois pour l'interface et appelle les pages
-  au fil des événements (accord joué, note jouée…) pour les surligner.
-Sans sortie audio, la lecture reste « visuelle » (le temps avance quand même).
+- `AudioPlayer` continuously mixes the sounds playing ("voices") and sends them
+  to the audio output, converted to the sound card's format (stereo, float…).
+  As on a guitar, a note or chord played keeps ringing when another one
+  is played: only a string played again cuts the note it carried.
+  A sequence (lick, scale, song) replaced or stopped dies out in a short
+  fade, without a click.
+- `Playback` follows one playback at a time for the interface and calls the pages
+  as events happen (chord played, note played…) to highlight them.
+Without an audio output, playback stays "visual" (time still moves on).
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from operator import add, mul
 
 from PySide6.QtCore import QElapsedTimer, QIODevice, QObject, Qt, QTimer
 
-from appcore.guitar_synth import audioop, fade_out
+from appcore.guitar_synth import FAST, audioop, fade_out, mix
 
 try:
     from PySide6.QtMultimedia import QAudioFormat, QAudioSink, QMediaDevices
@@ -31,15 +31,21 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-BUFFER_SECONDS = 0.08
-CUT_SECONDS = 0.012     # même corde rejouée : la note d'avant s'éteint aussitôt
-FADE_SECONDS = 0.12     # suite remplacée ou arrêtée : fondu rapide
-IDLE_STOP_MS = 1500     # plus rien à jouer depuis 1,5 s : la sortie audio s'arrête
+# Sound asked for in advance by the audio output: a touched note is heard that
+# much later, so as little as possible (the metronome runs with the same 50 ms).
+# If the sound crackles on a slow device, this is the value to raise.
+BUFFER_SECONDS = 0.05
+CUT_SECONDS = 0.012     # same string played again: the previous note stops at once
+FADE_SECONDS = 0.12     # sequence replaced or stopped: quick fade
+# Nothing left to play for 20 s: the audio output stops. Starting it again takes
+# a moment (up to a tenth of a second on a phone), heard as a late first note:
+# between two notes touched on the neck, the output stays open and plays silence.
+IDLE_STOP_MS = 20000
 IDLE_TICK_MS = 250
 
 
 class _Voice:
-    """Un son en cours : PCM 16 bits mono, à partir de l'image `start`."""
+    """A sound playing: 16-bit mono PCM, starting at frame `start`."""
 
     __slots__ = ("pcm", "start", "strings", "one_shot")
 
@@ -50,15 +56,24 @@ class _Voice:
     def end(self) -> int:
         return self.start + len(self.pcm) // 2
 
-    def cut(self, at: int, fade: int) -> None:
-        """S'éteint à partir de l'image `at`, en `fade` images."""
+    def cut(self, at: int, fade: int) -> "_Voice | None":
+        """Dies out from frame `at`, over `fade` frames. The sound is not copied
+        (a song weighs tens of megabytes, and the audio output waits meanwhile):
+        the voice just stops at `at`, and its short fading end is returned as a
+        voice of its own, to play with the others (None: nothing to cut)."""
         keep = at - self.start + fade
-        if keep * 2 < len(self.pcm):
-            self.pcm = fade_out(self.pcm[:max(0, keep) * 2], fade)
+        if keep * 2 >= len(self.pcm):
+            return None
+        keep = max(0, keep)
+        head = max(0, keep - fade)
+        view = memoryview(self.pcm)
+        end = fade_out(bytes(view[2 * head:2 * keep]), fade)
+        self.pcm = view[:2 * head]
+        return _Voice(end, self.start + head, self.strings, self.one_shot) if end else None
 
 
 def _sum(frames: int, segments: list[tuple[int, bytes]]) -> bytes:
-    """Somme de morceaux de PCM 16 bits mono placés dans `frames` images."""
+    """Sum of 16-bit mono PCM pieces placed in `frames` frames."""
     if not segments:
         return bytes(2 * frames)
     if len(segments) == 1 and segments[0][0] == 0 and len(segments[0][1]) == 2 * frames:
@@ -69,9 +84,11 @@ def _sum(frames: int, segments: list[tuple[int, bytes]]) -> bytes:
             a, b = 2 * offset, 2 * offset + len(pcm)
             acc[a:b] = audioop.add(bytes(acc[a:b]), pcm, 2)
         return bytes(acc)
-    # Sans audioop (Python 3.13 et plus, donc l'app Android en Python 3.14) :
-    # additions par tranches avec map(), sans boucle Python par échantillon
-    # (ce code tourne pendant la lecture, à chaque bloc demandé par la sortie).
+    # Without audioop (Python 3.13 and later, so the Android app on Python 3.14):
+    # this code runs during playback, for each block the output asks for.
+    if FAST:   # big integers as vectors: no work per sample (see guitar_synth)
+        return mix(frames, segments)
+    # else additions by slices with map(), without a Python loop per sample
     total = array("i", bytes(4 * frames))
     for offset, pcm in segments:
         src = array("h")
@@ -84,16 +101,16 @@ def _sum(frames: int, segments: list[tuple[int, bytes]]) -> bytes:
 
 
 class _Mix(QIODevice):
-    """Fournit à la sortie audio la somme des voix en cours, au fil de l'eau
-    (la sortie « tire » le son ; voir aussi metronome_engine)."""
+    """Feeds the audio output with the sum of the voices playing, as it goes
+    (the output "pulls" the sound; see also metronome_engine)."""
 
     def __init__(self, convert, frame_bytes: int) -> None:
         super().__init__()
-        self.convert = convert            # mono 16 bits -> format de la carte son
-        self.frame_bytes = frame_bytes    # octets par image à la sortie
-        self.lock = threading.Lock()      # la sortie peut lire depuis un autre fil
+        self.convert = convert            # 16-bit mono -> sound card format
+        self.frame_bytes = frame_bytes    # bytes per frame at the output
+        self.lock = threading.Lock()      # the output can read from another thread
         self.voices: list[_Voice] = []
-        self.frames = 0                   # images fournies depuis le départ de la sortie
+        self.frames = 0                   # frames supplied since the output started
 
     def reset(self) -> None:
         with self.lock:
@@ -101,27 +118,30 @@ class _Mix(QIODevice):
             self.frames = 0
 
     def add(self, pcm: bytes, strings: frozenset, one_shot: bool, sample_rate: int) -> int:
-        """Ajoute un son à partir de la prochaine image fournie et coupe ce qu'il
-        remplace. Renvoie l'image de départ du son."""
+        """Adds a sound from the next frame supplied and cuts what it
+        replaces. Returns the sound's start frame."""
         with self.lock:
             now = self.frames
             voices = []
             for voice in self.voices:
                 if voice.end <= now:
                     continue
-                if not voice.one_shot:        # une suite s'arrête
-                    voice.cut(now, int(FADE_SECONDS * sample_rate))
-                elif voice.strings & strings:  # corde rejouée
-                    voice.cut(now, int(CUT_SECONDS * sample_rate))
+                end = None
+                if not voice.one_shot:        # a sequence stops
+                    end = voice.cut(now, int(FADE_SECONDS * sample_rate))
+                elif voice.strings & strings:  # string played again
+                    end = voice.cut(now, int(CUT_SECONDS * sample_rate))
                 voices.append(voice)
+                if end is not None:
+                    voices.append(end)
             voices.append(_Voice(pcm, now, strings, one_shot))
             self.voices = voices
             return now
 
     def fade_all(self, fade: int) -> None:
         with self.lock:
-            for voice in self.voices:
-                voice.cut(self.frames, fade)
+            ends = [voice.cut(self.frames, fade) for voice in self.voices]
+            self.voices += [end for end in ends if end is not None]
 
     def silent(self) -> bool:
         with self.lock:
@@ -140,6 +160,8 @@ class _Mix(QIODevice):
                 a, b = max(t0, voice.start), min(t1, voice.end)
                 if a < b:
                     segments.append((a - t0, voice.pcm[2 * (a - voice.start):2 * (b - voice.start)]))
+        if not segments:   # silence (the output stays open between two notes): nothing to compute
+            return bytes(frames * self.frame_bytes)
         return self.convert(_sum(frames, segments))
 
     def writeData(self, data) -> int:
@@ -162,7 +184,7 @@ class AudioPlayer(QObject):
         self.sink = None
         self._clock = QElapsedTimer()
         self._running = False
-        self._start = 0           # image de départ du dernier son lancé
+        self._start = 0           # start frame of the last sound started
         self._quiet_ticks = 0
         self._idle = QTimer(self)
         self._idle.setInterval(IDLE_TICK_MS)
@@ -206,7 +228,7 @@ class AudioPlayer(QObject):
         return None
 
     def _convert(self, pcm: bytes) -> bytes:
-        """Mono 16 bits -> format de la carte son (canaux, flottant)."""
+        """16-bit mono -> sound card format (channels, float)."""
         src = array("h")
         src.frombytes(pcm)
         if self.float_samples:
@@ -219,7 +241,7 @@ class AudioPlayer(QObject):
         return out.tobytes()
 
     def play(self, pcm: bytes, strings: frozenset = frozenset(), one_shot: bool = False) -> None:
-        """Ajoute un son à ce qui sonne déjà (voir _Mix.add pour ce qu'il coupe)."""
+        """Adds a sound to what is already playing (see _Mix.add for what it cuts)."""
         self._clock.start()
         if not self.audio_ok:
             return
@@ -238,8 +260,8 @@ class AudioPlayer(QObject):
             self._idle.start()
 
     def stop(self, fade: bool = True) -> None:
-        """Éteint tout ce qui sonne : en un court fondu, ou tout de suite
-        (`fade=False`, par ex. quand l'app passe en arrière-plan)."""
+        """Silences everything playing: in a short fade, or at once
+        (`fade=False`, e.g. when the app goes to the background)."""
         if not (self.audio_ok and self._running):
             return
         if fade:
@@ -256,7 +278,7 @@ class AudioPlayer(QObject):
         self._mix.reset()
 
     def _check_idle(self) -> None:
-        """Plus rien ne sonne depuis un moment : on libère la sortie audio."""
+        """Nothing has played for a while: release the audio output."""
         if not self._running:
             return
         if not self._mix.silent():
@@ -267,15 +289,15 @@ class AudioPlayer(QObject):
             self._halt()
 
     def position(self) -> float:
-        """Temps écoulé depuis le début du dernier son lancé (ce qu'on entend)."""
+        """Time elapsed since the start of the last sound started (what is heard)."""
         if self.audio_ok and self._running:
             return self.sink.processedUSecs() / 1_000_000 - self._start / self.sample_rate
         return self._clock.elapsed() / 1000
 
 
 class Playback(QObject):
-    """Une seule lecture suivie à la fois par l'interface ; surligne au fil des
-    événements. Le son d'avant, lui, peut continuer de sonner (AudioPlayer)."""
+    """A single playback followed at a time by the interface; highlights as
+    events happen. The previous sound may keep ringing (AudioPlayer)."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -295,7 +317,7 @@ class Playback(QObject):
         return self.player.audio_ok
 
     def play(self, performance, owner=None, on_event=None, on_finish=None) -> None:
-        self._end()   # l'interface de la lecture d'avant (son géré par le lecteur)
+        self._end()   # the interface of the previous playback (sound handled by the player)
         self.performance, self.owner = performance, owner
         self._on_event, self._on_finish = on_event, on_finish
         self._next = 0
@@ -311,7 +333,7 @@ class Playback(QObject):
         return self.player.position() if self.performance is not None else 0.0
 
     def stop(self, fade: bool = True) -> None:
-        """Arrête la lecture et éteint ce qui sonne encore (fondu rapide)."""
+        """Stops playback and silences what still rings (quick fade)."""
         self.player.stop(fade)
         self._end()
 
@@ -330,7 +352,7 @@ class Playback(QObject):
             return
         pos = self.player.position()
         if pos >= perf.duration:
-            self._end()   # le son, fini lui aussi, ne coupe rien
+            self._end()   # the sound, also finished, cuts nothing
             return
         last = None
         while self._next < len(perf.events) and perf.events[self._next][0] <= pos:

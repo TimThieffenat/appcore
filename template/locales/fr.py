@@ -1,11 +1,11 @@
-"""Traduction : français (voir appcore/i18n.py).
+"""Translation: French (see appcore/i18n.py).
 
-Clé : le texte anglais du code ; valeur : sa traduction (un pluriel :
-(singulier, pluriel)). Les champs {nom} doivent rester tels quels.
-python appcore/tools/i18n_check.py dit ce qui manque après un changement de
-texte (--list les donne tous, prêts à copier ici). Les textes du socle
-(réglages, rapport d'erreur, accords…) sont traduits dans appcore/locales/ ;
-une entrée ici remplace celle du socle."""
+Key: the English text of the code; value: its translation (a plural:
+(singular, plural)). The {name} fields must stay as they are.
+python appcore/tools/i18n_check.py says what is missing after a text
+change (--list gives them all, ready to paste here). The base's texts
+(settings, error report, chords…) are translated in appcore/locales/;
+an entry here replaces the base's one."""
 # ruff: noqa: E501
 
 T = {

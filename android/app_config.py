@@ -5,7 +5,8 @@
     python3 appcore/android/app_config.py . --github-env >> "$GITHUB_ENV"
 
 writes "export APP_NAME=..." lines: name, version, Google Play package,
-Java package, permissions, signing key, extra folders, orientation. app_info.py
+Java package, permissions, signing key, extra folders, orientation, Pro
+product (which adds Google Play Billing and its permissions). app_info.py
 is read without being imported (runpy): its constants must not import anything.
 Anything missing takes the base's default value (appcore/app.py).
 """
@@ -30,6 +31,29 @@ def _permission(name: str) -> str:
     return name if "." in name else f"android.permission.{name}"
 
 
+# What a Pro version (PRO_PRODUCT) needs: Google Play Billing (PlayBilling.java.in,
+# version 8 required by Google Play since 31 August 2026). androidx.fragment: a
+# Google library brought by Billing pulls 1.1.0, flagged as outdated by the Play
+# Console; asking for it here makes Gradle take this newer one (it keeps the
+# highest).
+BILLING_DEPENDENCIES = ("com.android.billingclient:billing:8.3.0",
+                        "androidx.fragment:fragment:1.6.2")
+BILLING_PERMISSIONS = ("com.android.vending.BILLING", "ACCESS_NETWORK_STATE")
+
+
+def _merged(base, extra) -> list[str]:
+    """`base` then the items of `extra` it lacks (a Gradle dependency counts once,
+    whatever its version)."""
+    out = [str(x) for x in base]
+    keys = {x.rsplit(":", 1)[0] if x.count(":") == 2 else x for x in out}
+    for item in extra:
+        key = item.rsplit(":", 1)[0] if item.count(":") == 2 else item
+        if key not in keys:
+            out.append(item)
+            keys.add(key)
+    return out
+
+
 def config(root: Path) -> dict[str, str]:
     path = root / "app_info.py"
     if not path.is_file():
@@ -46,6 +70,14 @@ def config(root: Path) -> dict[str, str]:
         raise SystemExit(f"ANDROID_PACKAGE = {package!r}: needs at least two parts (com.name.app)")
     domain, _, short = package.rpartition(".")
     permissions = ", ".join(_permission(p) for p in info["ANDROID_PERMISSIONS"])
+    pro = str(info.get("PRO_PRODUCT") or "").strip()
+    if pro and not re.fullmatch(r"[a-z0-9][a-z0-9._]*", pro):
+        raise SystemExit(f"PRO_PRODUCT = {pro!r}: a Play product ID (lower case, digits, . _)")
+    gradle = list(info["GRADLE_DEPENDENCIES"])
+    library = [_permission(p) for p in info["LIBRARY_PERMISSIONS"]]
+    if pro:
+        gradle = _merged(gradle, BILLING_DEPENDENCIES)
+        library = _merged(library, [_permission(p) for p in BILLING_PERMISSIONS])
     return {
         "APP_NAME": name,
         "APP_SLUG": slug,
@@ -58,8 +90,9 @@ def config(root: Path) -> dict[str, str]:
         "APP_KEY_ALIAS": str(info["KEY_ALIAS"] or slug),
         "APP_KEYSTORE_NAME": str(info["KEYSTORE_NAME"] or f"{slug}-upload.jks"),
         "APP_EXTRA_DIRS": " ".join(str(d) for d in info["EXTRA_DIRS"]),
-        "APP_GRADLE_DEPS": ",".join(str(d) for d in info["GRADLE_DEPENDENCIES"]),
-        "APP_LIBRARY_PERMISSIONS": ", ".join(_permission(p) for p in info["LIBRARY_PERMISSIONS"]),
+        "APP_GRADLE_DEPS": ",".join(gradle),
+        "APP_LIBRARY_PERMISSIONS": ", ".join(library),
+        "APP_PRO_PRODUCT": pro,
         "APP_ORIENTATION": ("portrait" if str(info["ORIENTATION"]).lower() == "portrait"
                             else "landscape"),
     }

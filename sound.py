@@ -29,7 +29,17 @@ def set_voice_filter(allowed) -> None:
     _voice_allowed = allowed
 
 
+def pro_voices() -> tuple[str, ...]:
+    """The instruments reserved to the Pro version (PRO_VOICES of app_info.py)."""
+    from appcore import pro
+    return tuple(app.get("PRO_VOICES", ()) or ()) if pro.enabled() else ()
+
+
 def voice_allowed(key: str) -> bool:
+    if key in pro_voices():
+        from appcore import pro
+        if not pro.is_pro():
+            return False
     if _voice_allowed is None:
         return True
     try:

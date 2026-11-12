@@ -14,7 +14,8 @@ serves every app.
 |---|---|
 | `boot.py` | start-up: error report installed first, language, symbols font, theme, window, rebuilt when the language changes, data taken over from a former name |
 | `main_window.py` | the window: icon rail on the left (size adjusted to the screen) or, in portrait, navigation bar at the bottom with the home page standing out; pause / resume in the background (Android), Back key (to the home page) |
-| `page_settings.py` | the Settings page: language, theme, note names, instrument, error report; each app adds its own rows |
+| `page_settings.py` | the Settings page: the Pro version and its unlock code, language, theme, note names, instrument, error report; each app adds its own rows |
+| `pro.py`, `pro_ui.py`, `bridge.py` | the paid Pro version (`PRO_PRODUCT`): one-time Google Play purchase checked at start-up and on return, unlock code for Google Play's reviewers, purchase buttons, pages reserved to Pro (wall, gold padlock); the file bridge with the Java side |
 | `app.py` | what the base knows about the app: the constants of its `app_info.py` (with their default values) |
 | `i18n.py`, `locales/` | translations: `tr()`, `ntr()` (plurals), `N_()`; 6 languages (en fr es it pt de) for the base's texts |
 | `crash_report.py` | the app's log and error report (Python errors, native crashes, Android exit reasons), sent by email in one gesture |
@@ -25,7 +26,7 @@ serves every app.
 | `music_theory.py`, `chord_shapes.py` | notes, degrees, scales, chords, tunings, Do Ré Mi / C D E; playable guitar chord shapes (no Qt) |
 | `symbol_font.py`, `symbol_font_data.py` | built-in symbols font (♭ ♯ → ✓ ★…): never empty boxes |
 | `app_signals.py` | shared signals: settings changed, language changed, user data changed, paid version changed |
-| `android/` | the whole Android build: test APK, signed AAB for Google Play, fixes to Qt's tool, slimming, 16 KB pages, Java activity (screen kept on, exit reasons, file picker) — see **ANDROID.md** |
+| `android/` | the whole Android build: test APK, signed AAB for Google Play, fixes to Qt's tool, slimming, 16 KB pages, Java activity (screen kept on, exit reasons, file picker, file bridge, Google Play Billing for the Pro version) — see **ANDROID.md** |
 | `templates/github/workflows/` | the GitHub Actions workflows (APK, AAB, key), the same for every app |
 | `template/` | the template of a new app (see below) |
 | `tools/` | development tools: new app, translation check, interface check, symbols font |
@@ -55,7 +56,7 @@ MyApp/
   running the app). They are all described in `template/app_info.py`; only `NAME`
   is required. `ORIENTATION = "portrait"` puts the app in portrait (navigation
   bar at the bottom, APK in portrait); `HOME_PAGE` is the home page
-  (opened at start-up, standing out in the bottom bar, Back returns to it);
+  (its position or its icon's name; opened at start-up, standing out in the bottom bar, Back returns to it);
   `window.set_nav_visible(False)` hides the rail or the bar (full-screen game).
 - **`main.py`**:
   ```python
@@ -78,7 +79,7 @@ MyApp/
       sys.exit(boot.run(pages, qss=QSS, setup=setup))
   ```
   `boot.run` also accepts `started(window)` (once the window is shown:
-  purchases, reminders…), `on_language(code)` (when the language changes, before
+  reminders…), `on_language(code)` (when the language changes, before
   the window is rebuilt) and `window_class` (a subclass of
   `appcore.main_window.MainWindow`, for example to open a sheet from
   any page, like PerfectPitch's Pro sheet).
@@ -87,13 +88,27 @@ MyApp/
   (keys; otherwise Back returns to the home page). It listens to
   `bus.settings_changed` to follow a setting.
 - **Settings**: a subclass of `appcore.page_settings.SettingsPage`, which
-  overrides `rows()` (the order of the rows: `language_row()`, `theme_row()`,
-  `notation_row()`, `sound_row()`, `report_row()` and its own),
+  overrides `rows()` (the order of the rows: `pro_rows()`, `language_row()`,
+  `theme_row()`, `notation_row()`, `sound_row()`, `report_row()` and its own),
   possibly `SOUND_LABEL`, `sound_demo()` and `credits()`. `save(key,
-  value)` saves and notifies the pages. For a reserved instrument (paid
-  version…): `voice_text(key)` (its name in the list), `voice_refused(key)`
-  (what happens when it is chosen without the right to it) and, in the app's
-  `sound.py`, `set_voice_filter(fn)`; `fill_sounds()` rebuilds the list.
+  value)` saves and notifies the pages. For an instrument reserved some other
+  way: `voice_text(key)` (its name in the list), `voice_refused(key)` (what
+  happens when it is chosen without the right to it) and
+  `sound.set_voice_filter(fn)`; `fill_sounds()` rebuilds the list.
+- **Pro version** (one-time purchase on Google Play): `PRO_PRODUCT = "pro"` in
+  `app_info.py` (the product ID of the Play Console) and the base does the
+  rest: purchase checked at start-up and when the app comes back, price,
+  buy / restore (`pro.py`), the Java side and Google Play Billing in the APK,
+  the "<App> Pro" row and the unlock code for Google Play's reviewers in the
+  settings (`pro_rows()`, `UNLOCK_CODE_SHA256`, made by
+  `python appcore/tools/unlock_code.py`), the instruments of `PRO_VOICES`
+  marked "(Pro)". What Pro opens is up to the app: `pro.is_pro()`, and
+  `pro_ui.gate(PageClass, WallClass)` for a page reserved to Pro (its "wall"
+  until bought, a gold padlock on its icon; `pro_ui.PurchaseControls` gives the
+  status line and the purchase buttons). "Discover Pro" calls the window's
+  `open_pro()` (by default the first Pro page; a `window_class` can open a
+  sheet instead, like PerfectPitch). On a computer, "Unlock" is free (tests);
+  `<APP>_PRO=1` / `0` (e.g. `RIFFFINDER_PRO`) forces it.
 - **Icons**: `register("name", drawer)` in the app's `icons.py`; the drawer
   draws on a 24 × 24 grid with the pen already set.
 - **Style sheet**: `QSS` in `main.py` (or `style.add_qss()`), with the
@@ -121,8 +136,11 @@ MyApp/
   `profile_changed` (user data), `pro_changed` (paid version).
 - **Android, Java side**: an app can have its Java in
   `android/java/<package>/`; an `AppHooks.java` there (static methods `onCreate`,
-  `onResume`, `onRequestPermissionsResult`) is called by the base's
-  activity. Its Java libraries go in `GRADLE_DEPENDENCIES`, the
+  `onResume`, `onCommand`, `onRequestPermissionsResult`) is called by the base's
+  activity. Python talks to Java through files (`bridge.py`):
+  `bridge.request("reminder:update")` reaches `AppHooks.onCommand`, and the
+  app's Java answers with `Bridge.put("section", json)` (read back by
+  `bridge.state()`). Its Java libraries go in `GRADLE_DEPENDENCIES`, the
   permissions they add in `LIBRARY_PERMISSIONS` (`app_info.py`).
 - **Interface check**: the app's `tools/smoke_extra.py` adds its own
   tour (`prepare()`, `before_theme(theme)`, `tour(...)`,
@@ -149,6 +167,7 @@ page and the settings. Next: create the repository on GitHub,
 | `appcore\tools\smoke_test.bat` | everything at once (double-click): tests of the base and of the app, translations, interface check; results in `build\smoke\console.log` |
 | `python appcore/tools/smoke_test.py` | opens the app off screen (850 × 390 in landscape, 390 × 844 in portrait), each page in dark and in light, the error report, the desktop format, then each other language; screenshots in `build/smoke/`; the app's own tour in `tools/smoke_extra.py` (optional) |
 | `python appcore/tools/i18n_check.py` | the base's and the app's texts to translate, what is missing, what is no longer used (`--list`: all the app's texts, ready to paste; `--core`: the base alone) |
+| `python appcore/tools/unlock_code.py` | a new unlock code for Google Play's reviewers and its `UNLOCK_CODE_SHA256` line (`--check CODE`: does it open this version?) |
 | `python -m unittest discover -s appcore/tests -t .` | tests of the base |
 | `python appcore/tools/build_font.py` | rebuilds the app's symbols font (`--core`: the base's); needs fonttools and DejaVu Sans |
 | `bash appcore/android/build_apk.sh` | APK (Linux / WSL), see ANDROID.md |

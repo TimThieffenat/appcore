@@ -64,6 +64,12 @@ class AppConfigTests(unittest.TestCase):
         self.assertTrue(app.portrait())
         self.assertEqual(app.home_page(), 2)
         self.assertEqual(app.phone_size(), (390, 844))
+        pages = [("A", "play", None), ("B", "chords", None)]
+        self.assertEqual(app.home_page(pages), 1)           # 2, kept inside the list
+        info.HOME_PAGE = "chords"                           # by its icon's name
+        self.assertEqual(app.home_page(pages), 1)
+        info.HOME_PAGE = "missing"
+        self.assertEqual(app.home_page(pages), 0)
 
     def test_android_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -82,10 +88,113 @@ class AppConfigTests(unittest.TestCase):
             out = subprocess.run([sys.executable, str(CORE / "android" / "app_config.py"), tmp],
                                  capture_output=True, text=True, check=True).stdout
             self.assertIn("export APP_ORIENTATION=portrait", out.splitlines())
+            self.assertNotIn("billing", out)                               # no Pro version
+            Path(tmp, "app_info.py").write_text(
+                'NAME = "MyApp"\nPRO_PRODUCT = "pro"\n'
+                'GRADLE_DEPENDENCIES = ("com.android.billingclient:billing:9.0.0",)\n'
+                'LIBRARY_PERMISSIONS = ("WAKE_LOCK",)\n', encoding="utf-8")
+            out = subprocess.run([sys.executable, str(CORE / "android" / "app_config.py"), tmp],
+                                 capture_output=True, text=True, check=True).stdout
+            values = dict(line.removeprefix("export ").split("=", 1) for line in out.splitlines())
+            self.assertEqual(values["APP_PRO_PRODUCT"], "pro")
+            deps = values["APP_GRADLE_DEPS"].split(",")
+            self.assertEqual(deps[0], "com.android.billingclient:billing:9.0.0")   # the app's
+            self.assertEqual(sum("billingclient" in d for d in deps), 1)
+            self.assertIn("com.android.vending.BILLING", values["APP_LIBRARY_PERMISSIONS"])
+            self.assertIn("android.permission.WAKE_LOCK", values["APP_LIBRARY_PERMISSIONS"])
             Path(tmp, "app_info.py").write_text('NAME = "My App"\n', encoding="utf-8")
             bad = subprocess.run([sys.executable, str(CORE / "android" / "app_config.py"), tmp],
                                  capture_output=True, text=True)
             self.assertNotEqual(bad.returncode, 0)
+
+
+class ProTests(unittest.TestCase):
+    """Pro version (pro.py) and the file bridge with Java (bridge.py), without Qt."""
+
+    def setUp(self) -> None:
+        self._saved = app._info
+        info = types.ModuleType("app_info")
+        info.NAME = "RiffFinder"
+        app._info = info
+
+    def tearDown(self) -> None:
+        app._info = self._saved
+
+    def test_without_pro_version(self) -> None:
+        from appcore import pro
+        self.assertFalse(pro.enabled())
+        self.assertTrue(pro.is_pro())           # everything open
+        self.assertFalse(pro.code_enabled())
+        self.assertFalse(pro.redeem("RIFF-AAAA-BBBB-CCCC"))
+
+    def test_code(self) -> None:
+        import hashlib
+        import os
+
+        from appcore import pro
+        app._info.PRO_PRODUCT = "pro"
+        self.assertTrue(pro.enabled())
+        self.assertEqual(pro.normalize_code(" riff-ab12 cd "), "RIFFAB12CD")
+        # same fingerprint as before the base had it: the codes given stay valid
+        old = hashlib.sha256(("RiffFinder unlock code\n" + "RIFFAB12CD").encode()).hexdigest()
+        self.assertEqual(pro.code_hash("riff-ab12-cd"), old)
+        self.assertFalse(pro.code_enabled())    # no UNLOCK_CODE_SHA256
+        app._info.UNLOCK_CODE_SHA256 = old
+        self.assertTrue(pro.code_enabled())
+        saved = os.environ.get("RIFFFINDER_PRO")
+        try:
+            os.environ["RIFFFINDER_PRO"] = "1"
+            self.assertTrue(pro.is_pro())
+            os.environ["RIFFFINDER_PRO"] = "0"
+            self.assertFalse(pro.is_pro())
+        finally:
+            os.environ.pop("RIFFFINDER_PRO", None)
+            if saved is not None:
+                os.environ["RIFFFINDER_PRO"] = saved
+        tool = _tool("unlock_code")
+        self.assertTrue(tool.new_code().startswith("RIFF-"))
+        app._info.UNLOCK_CODE_PREFIX = "pitch"
+        self.assertTrue(tool.new_code().startswith("PITCH-"))
+
+    def test_bridge_files(self) -> None:
+        import os
+
+        from appcore import bridge
+        old = os.environ.pop("ANDROID_PRIVATE", None)
+        try:
+            self.assertFalse(bridge.available())
+            self.assertFalse(bridge.request("billing:buy"))
+            self.assertEqual(bridge.state(), {})
+            with tempfile.TemporaryDirectory() as folder:
+                os.environ["ANDROID_PRIVATE"] = folder
+                self.assertTrue(bridge.request("billing:buy"))
+                self.assertTrue(bridge.request("reminder:update"))
+                names = sorted(p.name for p in (Path(folder) / "bridge").iterdir())
+                self.assertEqual(len(names), 2)
+                self.assertTrue(all(n.startswith("request-") and n.endswith(".txt")
+                                    for n in names))
+                first = (Path(folder) / "bridge" / names[0]).read_text(encoding="utf-8")
+                self.assertEqual(first, "billing:buy")       # in the order of the requests
+                (Path(folder) / "bridge" / "state.json").write_text(
+                    '{"billing": {"pro": true, "price": "€4.99"}}', encoding="utf-8")
+                self.assertTrue(bridge.state()["billing"]["pro"])
+                self.assertTrue(bridge.write_json("reminder.json", {"hour": 19}))
+                self.assertEqual(bridge.read_json("reminder.json"), {"hour": 19})
+        finally:
+            os.environ.pop("ANDROID_PRIVATE", None)
+            if old is not None:
+                os.environ["ANDROID_PRIVATE"] = old
+
+    def test_java_templates(self) -> None:
+        """Without a Pro version, build_apk.sh removes the @PRO@ lines: what is
+        left of Bridge.java must not mention PlayBilling."""
+        text = (CORE / "android" / "java" / "Bridge.java.in").read_text(encoding="utf-8")
+        kept = [line for line in text.splitlines() if "@PRO@" not in line]
+        self.assertFalse([line for line in kept if "PlayBilling" in line
+                          and not line.lstrip().startswith(("*", "//"))])
+        self.assertIn("AppHooks.onCommand", text)
+        hooks = (CORE / "android" / "java" / "AppHooks.java.in").read_text(encoding="utf-8")
+        self.assertIn("static boolean onCommand", hooks)
 
 
 class TranslationTests(unittest.TestCase):

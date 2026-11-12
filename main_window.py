@@ -7,14 +7,17 @@
   (HOME_PAGE) stands out (in the middle of the bar, for example).
   `set_nav_visible(False)` hides the bar (a full-screen game…).
 
-The window opens on the home page (HOME_PAGE, the first one by default).
+The window opens on the home page (HOME_PAGE: its position or its icon's
+name; the first one by default).
 
 Pages come from the app (main.py): a list of (label, icon, class),
 the label marked N_() (translated here), the icon a name from appcore/icons.py
 or from the app's icons.py. A page can have:
 - app_paused() / app_resumed(): the app goes to the background / comes back;
 - handle_key(event) -> bool: keys (Android Back, Esc, digits…),
-  True if the page handled it. Otherwise Back returns to the home page.
+  True if the page handled it. Otherwise Back returns to the home page;
+- PRO = True (class attribute): reserved to the Pro version (pro.py), a gold
+  padlock on its icon until Pro is bought (see pro_ui.gate).
 """
 
 from __future__ import annotations
@@ -34,7 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from appcore import app, sound
+from appcore import app, pro, sound
 from appcore.app_signals import bus
 from appcore.i18n import tr
 from appcore.icons import nav_icon
@@ -69,7 +72,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.pages = list(pages)
         self.portrait = app.portrait()
-        self.home = min(app.home_page(), max(0, len(self.pages) - 1))
+        self.home = app.home_page(self.pages)
         self.setWindowTitle(app.name())
         if self.portrait:
             self.resize(420, 860)
@@ -133,6 +136,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(self.home)
         self._refresh_icons()
         bus.settings_changed.connect(self._refresh_icons)
+        bus.pro_changed.connect(self._refresh_icons)
 
         central = QWidget()
         layout = QVBoxLayout(central) if self.portrait else QHBoxLayout(central)
@@ -226,6 +230,7 @@ class MainWindow(QMainWindow):
         if not self._app_paused:
             return
         self._app_paused = False
+        pro.start()          # Pro purchase checked again (Java asks Google Play)
         for page in self._pages():
             if hasattr(page, "app_resumed"):
                 page.app_resumed()
@@ -234,6 +239,26 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(250, self.update)
 
     def _refresh_icons(self, *_) -> None:
+        """Navigation icons in the theme's colours; a page reserved to the Pro
+        version (page class with PRO = True, see pro_ui.py) carries a gold
+        padlock until Pro is bought."""
         pal = current_palette()
-        for button, icon in self.buttons:
-            button.setIcon(nav_icon(icon, pal["muted"], pal["accent_text"]))
+        locked = not pro.is_pro()
+        for index, (button, icon) in enumerate(self.buttons):
+            if locked and self._is_pro_page(index):
+                from appcore.pro_ui import locked_icon
+                button.setIcon(locked_icon(icon, pal["muted"], pal["accent_text"]))
+            else:
+                button.setIcon(nav_icon(icon, pal["muted"], pal["accent_text"]))
+
+    def _is_pro_page(self, index: int) -> bool:
+        return getattr(self.pages[index][2], "PRO", False) is True
+
+    def open_pro(self) -> None:
+        """Shows what the Pro version opens (Settings › "Discover Pro"…): here,
+        the first page reserved to Pro. An app with another place for it (a
+        sheet…) overrides this method."""
+        for index in range(len(self.pages)):
+            if self._is_pro_page(index):
+                self.show_page(index)
+                return

@@ -9,7 +9,8 @@ import android.app.Activity;
 /**
  * The app's hooks into the main activity (the base's KeepAwakeActivity).
  * An app with Java of its own (in-app purchase, notifications…) writes its
- * own AppHooks.java in android/java/<its package>/ with these three methods.
+ * own AppHooks.java in android/java/<its package>/ with these four methods.
+ * The bridge with Python (Bridge) is already started before onCreate/onResume.
  * Errors are caught by the activity.
  */
 final class AppHooks {
@@ -22,6 +23,14 @@ final class AppHooks {
 
     /** Each time the app comes back to the foreground. */
     static void onResume(Activity activity) {
+    }
+
+    /**
+     * A request from Python (appcore.bridge.request) that the base does not
+     * handle: return true if the app did.
+     */
+    static boolean onCommand(Activity activity, String command) {
+        return false;
     }
 
     /** The user's answer to a permission request. */

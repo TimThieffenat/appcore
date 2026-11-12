@@ -27,7 +27,8 @@ run(pages, qss=..., setup=..., started=..., on_language=..., window_class=...):
 - qss: the app's style sheet, added to the base's one (see style.py);
 - setup(app): right after the language and font, before the theme and the
   window (take over data, prepare a profile…);
-- started(window): once the first window is shown (purchases, reminders…);
+- started(window): once the first window is shown (reminders…; the Pro
+  purchase is checked by the base itself, see pro.py);
   an error there is logged without stopping the app from starting;
 - on_language(code): the language just changed, right before the window
   is rebuilt (texts kept outside the interface: notifications…);
@@ -218,11 +219,12 @@ def run(pages, qss: str = "", setup=None, started=None, on_language=None,
     windows = Windows(app, pages, window_class, on_language)
     try:
         crash_report.step("loading the app")
-        from appcore import sound, style
+        from appcore import pro, sound, style
         from appcore.app_signals import bus
 
         if qss:
             style.add_qss(qss)
+        pro.refresh()       # Pro version: the purchase already known, before the pages
         if setup is not None:
             crash_report.step("setting up the app")
             setup(app)
@@ -232,6 +234,10 @@ def run(pages, qss: str = "", setup=None, started=None, on_language=None,
         style.follow_system(app, bus.settings_changed.emit)
         bus.language_changed.connect(windows.change_language)
         windows.open()
+        try:
+            pro.start()     # Pro version: Google Play asked again (Android)
+        except Exception:  # noqa: BLE001 — never a reason not to start
+            log.warning("pro.start() failed", exc_info=True)
         if started is not None:
             crash_report.step("starting the app's services")
             try:

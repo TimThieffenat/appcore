@@ -35,9 +35,9 @@ OLD_NAMES = ()
 # Screen: "landscape" (phone in landscape, icon rail on the left) or
 # "portrait" (navigation bar at the bottom, the home page standing out).
 ORIENTATION = "landscape"                   # default: "landscape"
-# Home page: its index in main.py's pages() (0 = the first). The
-# window opens on it and Back returns to it; in portrait, in the middle of the
-# bottom bar with 5 pages, that is 2.
+# Home page: its index in main.py's pages() (0 = the first), or its icon's
+# name ("chords"). The window opens on it and Back returns to it; in portrait,
+# in the middle of the bottom bar with 5 pages, that is 2.
 HOME_PAGE = 0
 
 # --- Android ----------------------------------------------------------------------
@@ -52,9 +52,23 @@ KEY_ALIAS = "__app_slug__"
 KEYSTORE_NAME = "__app_slug__-upload.jks"
 # App folders copied into the APK on top of locales/ and sounds/ (libraries…)
 EXTRA_DIRS = ()
-# Java libraries added by Gradle (Google Play Billing, WorkManager…),
-# for the app's Java (android/java/<package>/, plugged in by AppHooks.java),
-# and the permissions they add to the APK by themselves (expected by the
-# end-of-build check), without the android.permission. prefix.
-GRADLE_DEPENDENCIES = ()      # e.g. ("com.android.billingclient:billing:8.3.0",)
-LIBRARY_PERMISSIONS = ()      # e.g. ("com.android.vending.BILLING",)
+# Java libraries added by Gradle (WorkManager…), for the app's Java
+# (android/java/<package>/, plugged in by AppHooks.java), and the permissions
+# they add to the APK by themselves (expected by the end-of-build check),
+# without the android.permission. prefix. Google Play Billing and its
+# permissions are added by themselves for a Pro version (PRO_PRODUCT).
+GRADLE_DEPENDENCIES = ()      # e.g. ("androidx.work:work-runtime:2.10.0",)
+LIBRARY_PERMISSIONS = ()      # e.g. ("WAKE_LOCK",)
+
+# --- Pro version (one-time purchase on Google Play, appcore/pro.py) -------------------
+# The product ID created in the Play Console (one-time, non-consumable), for
+# example "pro". Empty: no Pro version, no Google Play Billing in the APK.
+# What Pro opens: pages with PRO = True (appcore/pro_ui.gate), the
+# instruments of PRO_VOICES, and whatever the app asks pro.is_pro() about.
+PRO_PRODUCT = ""
+# Instruments (VOICES) reserved to Pro, e.g. ("nylon",)
+PRO_VOICES = ()
+# Unlock code for Google Play's reviewers (Settings › Unlock code): only its
+# fingerprint, made by python appcore/tools/unlock_code.py (empty: no code).
+UNLOCK_CODE_SHA256 = ""
+UNLOCK_CODE_PREFIX = ""       # start of new codes (default: 4 letters of the name)

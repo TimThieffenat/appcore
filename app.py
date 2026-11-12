@@ -47,6 +47,13 @@ DEFAULTS = {
     "EXTRA_DIRS": (),               # extra app folders copied into the APK
     "GRADLE_DEPENDENCIES": (),      # Java libraries (Gradle) used by the app's Java
     "LIBRARY_PERMISSIONS": (),      # permissions those libraries add (expected)
+    # Pro version (pro.py): Google Play product ID of the one-time purchase ("":
+    # no Pro version), fingerprint and prefix of the reviewers' unlock code,
+    # instruments reserved to Pro
+    "PRO_PRODUCT": "",
+    "UNLOCK_CODE_SHA256": "",
+    "UNLOCK_CODE_PREFIX": "",       # default: the first letters of the name
+    "PRO_VOICES": (),
 }
 
 _info = None
@@ -92,12 +99,21 @@ def portrait() -> bool:
     return str(get("ORIENTATION")).lower() == "portrait"
 
 
-def home_page() -> int:
-    """The home page: opened at start-up, the one Back returns to."""
+def home_page(pages=None) -> int:
+    """The home page: opened at start-up, the one Back returns to. HOME_PAGE is
+    its position, or the name of its icon ("chords"; needs `pages`, the list
+    of (label, icon, class) given to the window)."""
+    value = get("HOME_PAGE")
+    if isinstance(value, str) and not value.strip().isdigit():
+        for index, page in enumerate(pages or ()):
+            if page[1] == value.strip():
+                return index
+        return 0
     try:
-        return max(0, int(get("HOME_PAGE")))
+        index = max(0, int(value))
     except (TypeError, ValueError):
         return 0
+    return min(index, max(0, len(pages) - 1)) if pages else index
 
 
 def phone_size() -> tuple[int, int]:

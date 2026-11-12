@@ -3,7 +3,7 @@ report, and the app's own settings.
 
 Each app makes a subclass of it (its page_settings.py) that adds its
 rows by overriding rows(), and possibly sound_demo(), credits(),
-voice_text() / voice_refused() (instrument reserved to the Pro version…):
+voice_text() / voice_refused():
 
     class SettingsPage(BaseSettingsPage):
         SOUND_LABEL = N_("Guitar sound")
@@ -11,11 +11,18 @@ voice_text() / voice_refused() (instrument reserved to the Pro version…):
         def rows(self):
             self.capo_box = ui.combo(chars=18, min_width=200)
             ...
-            return [self.language_row(), self.theme_row(), self.notation_row(),
+            return self.pro_rows() + [
+                    self.language_row(), self.theme_row(), self.notation_row(),
                     (tr("Capo"), self.capo_box), self.sound_row(), self.report_row()]
 
 Rows are set with save(key, value): the setting is saved,
 written to the log, and the pages redrawn (bus.settings_changed).
+
+An app with a Pro version (PRO_PRODUCT of app_info.py, see pro.py) puts
+pro_rows() first: "<App> Pro" (button "Discover Pro", which calls the window's
+open_pro(), or "Unlocked ♛"), then the unlock code for Google Play's reviewers
+while Pro is closed (UNLOCK_CODE_SHA256). The instruments of PRO_VOICES show
+"(Pro)" and choosing one without Pro opens the Pro version (open_pro()).
 """
 
 from __future__ import annotations
@@ -34,7 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from appcore import app, crash_report, i18n, sound
+from appcore import app, crash_report, i18n, pro, sound
 from appcore import music_theory as mt
 from appcore import ui_common as ui
 from appcore.app_signals import bus
@@ -68,6 +75,10 @@ class SettingsPage(QWidget):
             label = QLabel(text)
             label.setObjectName("muted")
             form.addRow(label, widget)
+        self._form = form
+        if pro.enabled():
+            bus.pro_changed.connect(self._on_pro_changed)
+            self._on_pro_changed()
         about = QLabel(f"{app.name()} {app.version()}\n" + self.credits())
         about.setObjectName("muted")
         about.setWordWrap(True)
@@ -105,8 +116,8 @@ class SettingsPage(QWidget):
     # --- Rows ------------------------------------------------------------------------------
     def rows(self) -> list[tuple[str, QWidget]]:
         """The card's rows, in order: (translated label, control)."""
-        return [self.language_row(), self.theme_row(), self.notation_row(),
-                self.sound_row(), self.report_row()]
+        return self.pro_rows() + [self.language_row(), self.theme_row(),
+                                  self.notation_row(), self.sound_row(), self.report_row()]
 
     def language_row(self) -> tuple[str, QWidget]:
         box = ui.combo(chars=18, min_width=200)
@@ -154,12 +165,93 @@ class SettingsPage(QWidget):
         box.blockSignals(False)
 
     def voice_text(self, key: str) -> str:
-        """The text of an instrument in the list."""
-        return tr(VOICES[key][0])
+        """The text of an instrument in the list ("(Pro)" for those of PRO_VOICES
+        while Pro is closed)."""
+        text = tr(VOICES[key][0])
+        if key in sound.pro_voices() and not pro.is_pro():
+            text = tr("{name} (Pro)", name=text)
+        return text
 
     def voice_refused(self, key: str) -> None:
-        """A non-allowed instrument was chosen (sound.set_voice_filter):
-        the list goes back to the previous instrument; the app can offer the purchase."""
+        """A non-allowed instrument was chosen (PRO_VOICES, sound.set_voice_filter):
+        the list goes back to the previous instrument, and the Pro version is shown."""
+        if key in sound.pro_voices():
+            self.open_pro()
+
+    # --- Pro version (pro.py) --------------------------------------------------------------
+    def pro_rows(self) -> list[tuple[str, QWidget]]:
+        """"<App> Pro" and, while Pro is closed, the unlock code ([] in an app
+        without a Pro version)."""
+        if not pro.enabled():
+            return []
+        self.pro_button = QPushButton("")
+        self.pro_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.pro_button.clicked.connect(lambda *_: self.open_pro())
+        rows = [(tr("{app} Pro", app=app.name()), self.pro_button)]
+        if pro.code_enabled():
+            self.code_row = self._code_row()
+            rows.append((tr("Unlock code"), self.code_row))
+        return rows
+
+    def open_pro(self) -> None:
+        """What the Pro version opens (the window decides: a page, a sheet…)."""
+        window = self.window()
+        if hasattr(window, "open_pro"):
+            window.open_pro()
+
+    def _on_pro_changed(self, *_) -> None:
+        owned = pro.is_pro()
+        button = getattr(self, "pro_button", None)
+        if button is not None:
+            button.setText(tr("Unlocked ♛") if owned else tr("Discover Pro"))
+            button.setObjectName("toggle" if owned else "primary")
+            button.style().unpolish(button)
+            button.style().polish(button)
+        row = getattr(self, "code_row", None)
+        if row is not None and self._form.indexOf(row) >= 0:
+            self._form.setRowVisible(row, not owned)   # the code row only while Pro is closed
+        if hasattr(self, "sound_box") and sound.pro_voices():
+            self.fill_sounds()
+
+    def _code_row(self) -> QWidget:
+        """The unlock code field + "Unlock", and an error line below."""
+        from appcore.touch_input import close_keyboard_later
+
+        self.code_edit = ui.text_field(tr("Enter your code"), max_length=40)
+        self.code_edit.setInputMethodHints(Qt.InputMethodHint.ImhNoPredictiveText
+                                           | Qt.InputMethodHint.ImhPreferUppercase)
+        self.code_status = ui.label("", "muted", wrap=True)
+        self.code_status.hide()
+
+        def redeem() -> None:
+            text = self.code_edit.text()
+            if not text.strip():
+                return
+            close_keyboard_later(self.code_edit)
+            if pro.redeem(text):
+                self.code_edit.clear()        # Pro unlocked: the row disappears
+                return
+            self.code_status.setText(tr("This code is not valid."))
+            self.code_status.show()
+
+        self.code_edit.returnPressed.connect(redeem)
+        self.code_edit.textEdited.connect(lambda *_: self.code_status.hide())
+        button = QPushButton(tr("Unlock"))
+        button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        button.clicked.connect(lambda *_: redeem())
+
+        line = QHBoxLayout()
+        line.setContentsMargins(0, 0, 0, 0)
+        line.setSpacing(6)
+        line.addWidget(self.code_edit, 1)
+        line.addWidget(button)
+        box = QWidget()
+        column = QVBoxLayout(box)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(4)
+        column.addLayout(line)
+        column.addWidget(self.code_status)
+        return box
 
     def report_row(self) -> tuple[str, QWidget]:
         button = QPushButton(tr("Show"))

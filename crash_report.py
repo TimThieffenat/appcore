@@ -57,7 +57,8 @@ EXIT_PREV = "exit_reasons_prev.txt"  # the last one read, for the report
 KEEP_TRACES = 3         # Android crash traces kept
 QT_MESSAGES_MAX = 300   # Qt warnings written to the log, per launch
 # Settings copied into the report (to reproduce the problem in the same
-# conditions): the base's, the sound, then REPORT_SETTINGS of app_info.py
+# conditions): the base's, the sound, the Pro purchase, then REPORT_SETTINGS of
+# app_info.py
 SETTING_KEYS = ("language", "theme", "notation")
 
 # Android exit reasons (ApplicationExitInfo.REASON_*) that are a problem:
@@ -231,7 +232,11 @@ def app_title() -> str:
 def setting_keys() -> tuple[str, ...]:
     try:
         from appcore import app as config
-        return SETTING_KEYS + (str(config.get("SOUND_SETTING")),) + tuple(config.get("REPORT_SETTINGS"))
+        keys = SETTING_KEYS + (str(config.get("SOUND_SETTING")),)
+        if str(config.get("PRO_PRODUCT") or "").strip():
+            keys += ("pro/owned", "pro/code")       # Pro version (pro.py)
+        extra = tuple(k for k in config.get("REPORT_SETTINGS") if k not in keys)
+        return keys + extra
     except Exception:  # noqa: BLE001
         return SETTING_KEYS
 

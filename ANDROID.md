@@ -132,21 +132,28 @@ sleep as usual. This is the base's small Java activity
 (`appcore/android/java/KeepAwakeActivity.java.in`), which `build_apk.sh` puts in
 the app's Java package (`JAVA_PACKAGE`) and adds to the APK.
 
-**An app's Java** (Google Play purchases, notifications…): its files go
+**The Pro version** (`PRO_PRODUCT` in `app_info.py`): the base's Java does the
+purchase (`Bridge.java.in`, `PlayBilling.java.in`, in the app's package), and
+`build_apk.sh` adds Google Play Billing 8.3.0 and its permissions (BILLING,
+network state) by itself. Without `PRO_PRODUCT`, none of it is in the APK.
+
+**An app's Java** (notifications, reminders…): its files go
 in the app's `android/java/<package>/` (same package as `JAVA_PACKAGE`, for
 example `android/java/org/myapp/`); `build_apk.sh` adds them next to the
 base's (an app file with the same name replaces the base's). To react to the
 moments of the activity's life, the app writes an `AppHooks.java`
-with the static methods `onCreate(Activity)`, `onResume(Activity)` and
+with the static methods `onCreate(Activity)`, `onResume(Activity)`,
+`onCommand(Activity, String)` (a request from Python, `appcore.bridge.request`,
+that the base does not handle: return true if handled) and
 `onRequestPermissionsResult(Activity, int, String[], int[])` (without it, the
 base provides an empty one); an error in these methods is logged
-without stopping the app. The Java libraries it uses are declared in
-`GRADLE_DEPENDENCIES` (`app_info.py`, e.g.
-`"com.android.billingclient:billing:8.3.0"`), added to `build.gradle` by
+without stopping the app. The file bridge (`Bridge`: `put`, `read`,
+`folder`, `TAG`) is started before them. The Java libraries it uses are
+declared in `GRADLE_DEPENDENCIES` (`app_info.py`, e.g.
+`"androidx.work:work-runtime:2.10.0"`), added to `build.gradle` by
 the fix to Qt's tool; the permissions these libraries add by themselves
-(BILLING, WAKE_LOCK…) go in `LIBRARY_PERMISSIONS`, so that the end-of-build
-check does not flag them. Full example: PerfectPitch (Pro purchase, evening
-reminder).
+(WAKE_LOCK…) go in `LIBRARY_PERMISSIONS`, so that the end-of-build
+check does not flag them. Full example: PerfectPitch (evening reminder).
 
 ## If something goes wrong
 

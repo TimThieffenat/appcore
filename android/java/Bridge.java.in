@@ -1,0 +1,183 @@
+// Base template (appcore/android/java/): build_apk.sh fills in the Java package
+// and the app's name; the lines ending with the Pro marker comment are
+// removed in an app without a Pro version (no PlayBilling class then).
+
+package @JAVA_PACKAGE@;
+
+import android.app.Activity;
+import android.os.FileObserver;
+import android.util.Log;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
+/**
+ * The bridge between Python and Java, through files (folder files/bridge):
+ *
+ * - Python drops a request: a file "request-&lt;n&gt;.txt" (written under
+ *   another name then renamed), holding a command. Java reads it, deletes it
+ *   and runs it: "billing:buy", "billing:restore" (Pro version, PlayBilling);
+ *   any other command goes to the app's AppHooks.onCommand.
+ * - Java keeps "state.json" up to date (written then renamed, never half
+ *   written), one section per subject: {"billing": {…}, …}; an app's Java adds
+ *   its own with Bridge.put. Python reads it back (appcore/bridge.py).
+ * - Other files can be shared the same way (Bridge.read, Bridge.folder).
+ *
+ * Started by the main activity (KeepAwakeActivity) before the app's hooks.
+ */
+final class Bridge {
+    static final String TAG = "@APP_NAME@";
+    static final String STATE = "state.json";
+    private static final Object LOCK = new Object();
+    private static Activity activity;
+    private static File folder;
+    private static FileObserver observer;
+    private static JSONObject state = new JSONObject();
+
+    private Bridge() {
+    }
+
+    static File folder(android.content.Context context) {
+        File dir = new File(context.getFilesDir(), "bridge");
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            Log.w(TAG, "bridge folder not created");
+        }
+        return dir;
+    }
+
+    static void start(Activity current) {
+        activity = current;
+        folder = folder(current);
+        String previous = read(new File(folder, STATE));
+        if (previous != null) {
+            try {
+                state = new JSONObject(previous);
+            } catch (JSONException error) {
+                state = new JSONObject();
+            }
+        }
+        PlayBilling.start(current);   // @PRO@
+        // FileObserver(String, int): the constructor that exists on every version
+        observer = new FileObserver(folder.getAbsolutePath(),
+                FileObserver.MOVED_TO | FileObserver.CLOSE_WRITE) {
+            @Override
+            public void onEvent(int event, String path) {
+                if (path != null && path.startsWith("request-") && path.endsWith(".txt")
+                        && activity != null) {
+                    activity.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            processRequests();
+                        }
+                    });
+                }
+            }
+        };
+        observer.startWatching();
+        processRequests();
+    }
+
+    static void resume(Activity current) {
+        activity = current;
+        if (folder == null) {
+            return;
+        }
+        processRequests();
+        PlayBilling.refresh();   // @PRO@
+    }
+
+    /** Runs the waiting requests, in order (on the interface thread). */
+    static void processRequests() {
+        if (folder == null) {
+            return;
+        }
+        File[] files = folder.listFiles();
+        if (files == null) {
+            return;
+        }
+        Arrays.sort(files);
+        for (File file : files) {
+            String name = file.getName();
+            if (!name.startsWith("request-") || !name.endsWith(".txt")) {
+                continue;
+            }
+            String command = read(file);
+            if (!file.delete()) {
+                Log.w(TAG, "request not deleted: " + name);
+            }
+            if (command != null) {
+                dispatch(command.trim());
+            }
+        }
+    }
+
+    private static void dispatch(String command) {
+        Log.i(TAG, "bridge request: " + command);
+        try {
+            if (command.equals("billing:buy")) {   // @PRO@
+                PlayBilling.buy(activity);   // @PRO@
+                return;   // @PRO@
+            }   // @PRO@
+            if (command.equals("billing:restore")) {   // @PRO@
+                PlayBilling.refresh();   // @PRO@
+                return;   // @PRO@
+            }   // @PRO@
+            if (!AppHooks.onCommand(activity, command)) {
+                Log.w(TAG, "bridge request unknown: " + command);
+            }
+        } catch (Throwable error) {
+            Log.w(TAG, "bridge request failed: " + command + ": " + error);
+        }
+    }
+
+    /** Replaces a section of state.json ("billing", or one of the app's). */
+    static void put(String section, JSONObject value) {
+        synchronized (LOCK) {
+            try {
+                value.put("time", System.currentTimeMillis());
+                state.put(section, value);
+            } catch (JSONException error) {
+                return;
+            }
+            if (folder == null) {
+                return;
+            }
+            File tmp = new File(folder, STATE + ".tmp");
+            try (OutputStream out = new FileOutputStream(tmp)) {
+                out.write(state.toString().getBytes(StandardCharsets.UTF_8));
+            } catch (IOException error) {
+                Log.w(TAG, "state not written: " + error);
+                return;
+            }
+            if (!tmp.renameTo(new File(folder, STATE))) {
+                Log.w(TAG, "state not renamed");
+            }
+        }
+    }
+
+    static String read(File file) {
+        if (!file.isFile()) {
+            return null;
+        }
+        try (InputStream in = new FileInputStream(file)) {
+            byte[] data = new byte[(int) Math.min(file.length(), 64 * 1024)];
+            int total = 0;
+            int count;
+            while (total < data.length && (count = in.read(data, total, data.length - total)) > 0) {
+                total += count;
+            }
+            return new String(data, 0, total, StandardCharsets.UTF_8);
+        } catch (IOException error) {
+            return null;
+        }
+    }
+}

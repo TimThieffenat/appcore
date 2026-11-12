@@ -93,6 +93,8 @@ def main() -> int:
     extra = _extra()
     if extra is not None and hasattr(extra, "prepare"):
         extra.prepare()            # before setup: test data (temporary profile…)
+    from appcore import pro
+    pro.refresh()                  # as boot.py: the known purchase (<APP>_PRO forces it)
     if callable(getattr(app_main, "setup", None)):
         app_main.setup(app)
 

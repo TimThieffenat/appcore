@@ -252,8 +252,16 @@ for template in "$CORE"/android/java/*.java.in; do
         echo "Java: the app's $(basename "$target") (instead of the base's template)"
         continue
     fi
-    sed -e "s/@JAVA_PACKAGE@/$JAVA_PACKAGE/g" -e "s/@APP_NAME@/$APP_NAME/g" \
-        -e "s/@APP_SLUG@/$APP_SLUG/g" "$template" > "$target"
+    if [ -z "$APP_PRO_PRODUCT" ]; then
+        # no Pro version (PRO_PRODUCT empty): no Google Play Billing at all
+        [ "$(basename "$template")" = "PlayBilling.java.in" ] && continue
+        sed -e '/@PRO@/d' -e "s/@JAVA_PACKAGE@/$JAVA_PACKAGE/g" -e "s/@APP_NAME@/$APP_NAME/g" \
+            -e "s/@APP_SLUG@/$APP_SLUG/g" "$template" > "$target"
+    else
+        sed -e "s/@JAVA_PACKAGE@/$JAVA_PACKAGE/g" -e "s/@APP_NAME@/$APP_NAME/g" \
+            -e "s/@APP_SLUG@/$APP_SLUG/g" -e "s/@PRO_PRODUCT@/$APP_PRO_PRODUCT/g" \
+            -e 's#   // @PRO@$##' "$template" > "$target"
+    fi
 done
 export APPCORE_JAVA_SRC="$BUILD/java"
 export APPCORE_ENTRYPOINT="$JAVA_PACKAGE.KeepAwakeActivity"

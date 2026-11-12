@@ -22,8 +22,10 @@ import org.kivy.android.PythonActivity;
  * - before Python starts, the reasons for the app's last exits
  *   (crash, "not responding"…) are recorded for the error report
  *   (see ExitReasons and crash_report.py);
- * - the app's hooks (AppHooks, in its android/java/: in-app purchase,
- *   notifications…) at creation, when coming back to the foreground and on the
+ * - the file bridge with Python (Bridge: Pro purchase, the app's commands),
+ *   started before the app's hooks;
+ * - the app's hooks (AppHooks, in its android/java/: notifications…) at
+ *   creation, when coming back to the foreground and on the
  *   answer to a permission request; always guarded by try/catch: an error
  *   in the app must never stop the activity from starting;
  * - the result of Android's file picker is passed on to Qt.
@@ -43,6 +45,11 @@ public class KeepAwakeActivity extends PythonActivity {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         try {
+            Bridge.start(this);
+        } catch (Throwable error) {
+            Log.w(TAG, "bridge (create) failed: " + error);
+        }
+        try {
             AppHooks.onCreate(this);
         } catch (Throwable error) {
             Log.w(TAG, "app hooks (create) failed: " + error);
@@ -52,6 +59,11 @@ public class KeepAwakeActivity extends PythonActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        try {
+            Bridge.resume(this);
+        } catch (Throwable error) {
+            Log.w(TAG, "bridge (resume) failed: " + error);
+        }
         try {
             AppHooks.onResume(this);
         } catch (Throwable error) {
